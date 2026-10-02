@@ -493,6 +493,7 @@ def compute(u, F, s):
 
     # TTM ומאזן
     rev_t, ni_t, eps_t, op_t = T.get("rev"), T.get("ni"), T.get("eps"), T.get("opinc")
+    prev_eps_fy = eps[-1] if F.get("ttm_end") != fy[-1] else (eps[-2] if len(eps) > 1 else None)
     fcf_t = None if T.get("ocf") is None else T["ocf"] - (T.get("capex") or 0)
     ebitda_t = None if op_t is None else op_t + (T.get("da") or 0)
     debt, cash, eq = B.get("debt") or 0, B.get("cash") or 0, B.get("equity")
@@ -579,7 +580,12 @@ def compute(u, F, s):
     pe_h, pfcf_h, eve_h = med(hist_pe), med(hist_pfcf), med(hist_eve)
     vs = lambda cur, h: (cur / h - 1) if cur and h else None
     pe_vs, pfcf_vs, eve_vs = vs(pe, pe_h), vs(pfcf, pfcf_h), vs(ev_ebitda, eve_h)
-    peg = safe_div(pe, eps_g * 100) if pe and eps_g and eps_g > 0 else None
+    # צמיחה שמרנית: הנמוכה מבין הממוצע ההיסטורי לבין הקצב הנוכחי
+    rev_now = F.get("yoy", {}).get("rev")
+    eps_now = (eps_t / prev_eps_fy - 1) if eps_t is not None and prev_eps_fy and prev_eps_fy > 0 else None
+    eps_g_cons = min([x for x in (eps_g, eps_now) if x is not None], default=None)
+    peg = safe_div(pe, eps_g_cons * 100) if pe and eps_g_cons and eps_g_cons > 0 else None
+    peg_negative = pe is not None and eps_g_cons is not None and eps_g_cons <= 0
 
     # DCF פשוט ושמרני
     iv = mos = None
@@ -587,7 +593,9 @@ def compute(u, F, s):
     if fcf_t and fcf_t > 0 and g_in:
         avg3 = np.mean([x for x in fcf[-3:] if x is not None] or [fcf_t])
         base = min(fcf_t, avg3 * 1.5) if avg3 > 0 else fcf_t
-        g = min(max(float(np.mean(g_in)), 0), C["dcf_growth_cap"])
+        g_hist = float(np.mean(g_in))
+        g = min(g_hist, rev_now) if rev_now is not None else g_hist
+        g = min(max(g, 0), C["dcf_growth_cap"])
         r, tg = C["discount_rate"], C["terminal_growth"]
         pv, f = 0, base
         for y in range(1, 11):
@@ -614,8 +622,9 @@ def compute(u, F, s):
         check("P/FCF", cheap(pfcf, pfcf_vs, C["pfcf_max"]), num(pfcf) + hv(pfcf_vs), 2),
         check("EV/EBITDA", cheap(ev_ebitda, eve_vs, C["ev_ebitda_max"]), num(ev_ebitda) + hv(eve_vs), 1.5),
         check("EV/EBIT", None if ev_ebit is None else (1 if ev_ebit <= C["ev_ebit_max"] else (0.5 if ev_ebit <= C["ev_ebit_max"] * 1.3 else 0)), num(ev_ebit), 1),
-        check("PEG", None if peg is None else (1 if peg <= 1 else (0.5 if peg <= C["peg_max"] else 0)), num(peg, 2), 1.5),
-        check("Margin of Safety (DCF)", None if mos is None else (1 if mos >= C["mos_good"] else (0.5 if mos >= C["mos_min"] else 0)),
+        check("PEG (לפי צמיחה שמרנית)", 0 if peg_negative else (None if peg is None else (1 if peg <= 1 else (0.5 if peg <= C["peg_max"] else 0))),
+              "צמיחה שלילית כרגע" if peg_negative else num(peg, 2), 1.5),
+        check("Margin of Safety (DCF שמרני)", None if mos is None else (1 if mos >= C["mos_good"] else (0.5 if mos >= C["mos_min"] else 0)),
               pct(mos) + ("" if iv is None else f" (שווי פנימי ${iv:,.0f})"), 3),
     ]
     cheap_signals = sum(1 for c in V if c["s"] == 1)
