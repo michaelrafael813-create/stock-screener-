@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>סורק Buy the Dip</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📉</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Hebrew:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EEF1F4; --panel:#FFFFFF; --ink:#18232E; --muted:#5B6874; --line:#D6DDE3; --hover:#F5F7F9;
+  --green:#1D7652; --green-bg:#E3F1EA; --amber:#A86A12; --amber-bg:#FBF0DD;
+  --blue:#2D5F9C; --blue-bg:#E4ECF6; --red:#B03A3A; --red-bg:#F8E5E5;
+  --q:#2D5F9C; --v:#1D7652; --d:#A86A12;
+  --font:"IBM Plex Sans Hebrew", "Arial Hebrew", "Segoe UI", Arial, sans-serif;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#121A22; --panel:#1A242E; --ink:#E6ECF1; --muted:#97A5B2; --line:#2C3946; --hover:#212D38;
+    --green:#4FBF8C; --green-bg:#173327; --amber:#E0A44A; --amber-bg:#36291A;
+    --blue:#7DA9E0; --blue-bg:#1A2B40; --red:#E77C7C; --red-bg:#3A1F22;
+    --q:#7DA9E0; --v:#4FBF8C; --d:#E0A44A;
+  }
+}
+*,*::before,*::after{box-sizing:inherit}
+[hidden]{display:none!important}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.5}
+.ltr{direction:ltr;unicode-bidi:isolate;display:inline-block}
+.num{font-variant-numeric:tabular-nums}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+
+header{max-width:1280px;margin:0 auto;padding:28px 20px 8px;display:flex;flex-wrap:wrap;gap:12px 32px;align-items:flex-end;justify-content:space-between}
+h1{font-size:26px;font-weight:700;margin:0;letter-spacing:-.01em}
+.sub{color:var(--muted);font-size:14px;margin-top:2px}
+
+.tiers{max-width:1280px;margin:12px auto 0;padding:0 20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.tier{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;text-align:start;cursor:pointer;display:flex;flex-direction:column;gap:2px}
+.tier b{font-size:24px;font-weight:700}
+.tier span{color:var(--muted);font-size:13px}
+.tier[aria-pressed="true"]{border-color:currentColor;box-shadow:inset 0 0 0 1px currentColor}
+.tier.green{color:var(--green)} .tier.yellow{color:var(--amber)} .tier.watch{color:var(--blue)} .tier.all{color:var(--ink)}
+.tier .lbl{color:var(--ink);font-weight:600;font-size:14px}
+
+.tools{max-width:1280px;margin:14px auto 0;padding:0 20px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.tools input[type=search]{flex:1 1 220px;min-width:180px;padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+.tools select{padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+.toggle{display:flex;align-items:center;gap:6px;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel);cursor:pointer;font-size:14px}
+.count{color:var(--muted);font-size:13px;margin-inline-start:auto}
+
+.wrap{max-width:1280px;margin:12px auto 40px;padding:0 20px}
+.tablebox{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:960px}
+th,td{padding:10px 12px;text-align:start;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-size:12.5px;font-weight:600;color:var(--muted);background:var(--panel);position:sticky;top:0;cursor:pointer;user-select:none}
+th[aria-sort="descending"]::after{content:" ▼";font-size:10px}
+th[aria-sort="ascending"]::after{content:" ▲";font-size:10px}
+tbody tr{cursor:pointer}
+tbody tr:hover{background:var(--hover)}
+tbody tr:last-child td{border-bottom:0}
+.tk{font-weight:700;font-size:15px}
+.nm{color:var(--muted);font-size:12.5px;max-width:220px;overflow:hidden;text-overflow:ellipsis;display:block}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-inline-end:6px;vertical-align:middle}
+.dot.green{background:var(--green)} .dot.yellow{background:var(--amber)} .dot.watch{background:var(--blue)} .dot.other,.dot.nodata{background:var(--line)}
+.new{font-size:11px;font-weight:700;color:var(--green);background:var(--green-bg);border-radius:4px;padding:1px 6px;margin-inline-start:6px}
+
+/* הסימן המזהה: פס ציון שמראה מאיפה הגיע הציון */
+.score{display:flex;align-items:center;gap:10px}
+.score b{font-size:17px;min-width:34px}
+.bar{display:flex;width:92px;height:8px;border-radius:2px;background:var(--hover);overflow:hidden}
+.bar i{display:block;height:100%}
+.bar .bq{background:var(--q)} .bar .bv{background:var(--v)} .bar .bd{background:var(--d)}
+.big .bar{width:100%;height:14px;border-radius:3px}
+
+.pos{color:var(--green)} .neg{color:var(--red)} .mut{color:var(--muted)}
+.tech{font-size:13px}
+.flags{font-size:12.5px}
+.flags .r{color:var(--red);font-weight:600}
+.flags .y{color:var(--amber)}
+.more{display:block;margin:14px auto 0;padding:10px 22px;border:1px solid var(--line);border-radius:8px;background:var(--panel);cursor:pointer}
+.empty{padding:40px 20px;text-align:center;color:var(--muted)}
+
+/* מגירת פרטים */
+.scrim{position:fixed;inset:0;background:rgba(10,18,26,.35);opacity:0;pointer-events:none;transition:opacity .2s}
+.scrim.open{opacity:1;pointer-events:auto}
+aside{position:fixed;top:0;bottom:0;left:0;width:min(560px,100%);background:var(--panel);border-inline-start:1px solid var(--line);
+  transform:translateX(-102%);transition:transform .25s ease;overflow-y:auto;z-index:5;
+  padding:calc(18px + env(safe-area-inset-top,0px)) 22px calc(30px + env(safe-area-inset-bottom,0px))}
+aside.open{transform:none}
+@media (prefers-reduced-motion:reduce){aside,.scrim{transition:none}}
+.dhead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.dhead h2{margin:0;font-size:24px}
+.close{border:1px solid var(--line);background:var(--panel);border-radius:8px;width:36px;height:36px;cursor:pointer;font-size:18px;flex:none}
+.kv{display:flex;flex-wrap:wrap;gap:6px 18px;color:var(--muted);font-size:13.5px;margin:6px 0 14px}
+.kv b{color:var(--ink);font-weight:600}
+.legend{display:flex;gap:14px;font-size:12.5px;color:var(--muted);margin-top:6px}
+.legend span::before{content:"";display:inline-block;width:9px;height:9px;border-radius:2px;margin-inline-end:5px;vertical-align:middle;background:var(--c)}
+section.blk{margin-top:20px}
+section.blk h3{font-size:15px;margin:0 0 6px;display:flex;justify-content:space-between}
+section.blk h3 small{color:var(--muted);font-weight:500}
+.chk{width:100%;border-collapse:collapse;min-width:0}
+.chk td{padding:6px 4px;border-bottom:1px solid var(--line);font-size:13.5px;white-space:normal}
+.chk td:first-child{width:24px;text-align:center;font-weight:700}
+.chk td:last-child{text-align:end;color:var(--muted)}
+.s1{color:var(--green)} .s05{color:var(--amber)} .s0{color:var(--red)} .sn{color:var(--muted)}
+.flagbox{border-radius:8px;padding:10px 12px;margin-top:10px;font-size:13.5px}
+.flagbox.r{background:var(--red-bg);color:var(--red)} .flagbox.y{background:var(--amber-bg);color:var(--amber)}
+.flagbox ul{margin:4px 0 0;padding-inline-start:18px}
+.sparks{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.spark{border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.spark div{font-size:12.5px;color:var(--muted);display:flex;justify-content:space-between}
+.spark svg{display:block;width:100%;height:46px;margin-top:4px}
+.manual li{margin:4px 0;font-size:13.5px}
+.links{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.links a{color:var(--blue);text-decoration:none;border:1px solid var(--line);border-radius:6px;padding:5px 10px;font-size:13px}
+footer{max-width:1280px;margin:0 auto 30px;padding:0 20px;color:var(--muted);font-size:12.5px}
+@media (max-width:640px){
+  header{padding-top:18px} h1{font-size:22px}
+  .tiers{grid-template-columns:1fr 1fr}
+  .sparks{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>סורק Buy the Dip</h1>
+    <div class="sub" id="sub">טוען נתונים…</div>
+  </div>
+</header>
+
+<div class="tiers" id="tiers"></div>
+
+<div class="tools">
+  <input type="search" id="q" placeholder="חיפוש לפי שם או סימול" aria-label="חיפוש">
+  <select id="sector" aria-label="סקטור"><option value="">כל הסקטורים</option></select>
+  <select id="tech" aria-label="מצב טכני">
+    <option value="">כל המצבים הטכניים</option>
+    <option value="down">🔻 עדיין בירידה</option>
+    <option value="flat">➖ מתייצבת</option>
+    <option value="up">🔼 מתחילה להתאושש</option>
+  </select>
+  <select id="dd" aria-label="ירידה מהשיא">
+    <option value="0">כל רמות הירידה</option>
+    <option value="0.2">ירידה של 20% ומעלה</option>
+    <option value="0.3">ירידה של 30% ומעלה</option>
+    <option value="0.5">ירידה של 50% ומעלה</option>
+  </select>
+  <label class="toggle"><input type="checkbox" id="onlynew"> רק חדשות</label>
+  <label class="toggle"><input type="checkbox" id="nored"> בלי דגלים אדומים</label>
+  <span class="count" id="count"></span>
+</div>
+
+<div class="wrap">
+  <div class="tablebox">
+    <table>
+      <thead><tr id="thead"></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div class="empty" id="empty" hidden></div>
+  </div>
+  <button class="more" id="more" hidden>הצג עוד 100</button>
+</div>
+
+<footer>
+  הסורק מסנן לפי נתונים כספיים בלבד ואינו ייעוץ השקעות. Moat, איכות ההנהלה, נתח שוק והסיבה לירידה דורשים בדיקה ידנית.
+  נתונים: דוחות SEC, מחירים מ-Yahoo Finance (בעיכוב של כ-15 דקות).
+</footer>
+
+<div class="scrim" id="scrim"></div>
+<aside id="drawer" aria-hidden="true" role="dialog" aria-label="פרטי מניה"></aside>
+
+<script>
+const TIERS = {
+  green:{name:"עומדות כמעט בהכל", hint:"המועמדות החזקות"},
+  yellow:{name:"קרובות", hint:"חסר קריטריון או שניים"},
+  watch:{name:"רשימת מעקב", hint:"איכותיות, עוד לא זולות"},
+  all:{name:"כל המניות", hint:"מדורגות לפי ציון"}
+};
+const TECH = {down:"🔻 בירידה", flat:"➖ מתייצבת", up:"🔼 מתאוששת"};
+const COLS = [
+  {k:"rank", l:"#", sort:null},
+  {k:"t", l:"מניה", sort:s=>s.t},
+  {k:"score", l:"ציון", sort:s=>s.score},
+  {k:"dd52", l:"ירידה מהשיא", sort:s=>s.dd52},
+  {k:"mos", l:"Margin of Safety", sort:s=>s.mos},
+  {k:"pfcf", l:"P/FCF", sort:s=>s.pfcf},
+  {k:"pe", l:"P/E", sort:s=>s.pe},
+  {k:"roic", l:"ROIC", sort:s=>s.roic},
+  {k:"rev_g", l:"צמיחת הכנסות", sort:s=>s.rev_g},
+  {k:"tech", l:"מצב טכני", sort:s=>({down:0,flat:1,up:2})[s.tech.state]},
+  {k:"flags", l:"דגלים", sort:s=>s.red.length*10+s.yellow.length},
+];
+let ALL=[], view=[], shown=100, st={tier:"all", key:"score", dir:-1};
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const pct=(x,d=0)=>x==null?'<span class="mut">—</span>':`<span class="ltr num">${(x*100).toFixed(d)}%</span>`;
+const n1=x=>x==null?'<span class="mut">—</span>':`<span class="ltr num">${x>=100?x.toFixed(0):x.toFixed(1)}</span>`;
+
+function bar(s){
+  const W={q:.40,v:.35,d:.25}, f=x=>x==null?0:x;
+  return `<span class="bar" title="איכות ${s.q??"—"} · תמחור ${s.v??"—"} · ירידה ${s.d??"—"}">`+
+    `<i class="bq" style="width:${f(s.q)*W.q}%"></i><i class="bv" style="width:${f(s.v)*W.v}%"></i><i class="bd" style="width:${f(s.d)*W.d}%"></i></span>`;
+}
+
+async function load(){
+  try{
+    const r = await fetch("results.json",{cache:"no-store"});
+    if(!r.ok) throw new Error(r.status);
+    const data = await r.json();
+    ALL = data.stocks;
+    const t = new Date(data.generated);
+    $("sub").textContent = `עודכן ${t.toLocaleString("he-IL",{dateStyle:"short",timeStyle:"short"})} · ${data.count.toLocaleString("he-IL")} מניות בשווי שוק מעל 2 מיליארד $`;
+    const secs=[...new Set(ALL.map(s=>s.sector).filter(Boolean))].sort();
+    $("sector").insertAdjacentHTML("beforeend", secs.map(s=>`<option>${esc(s)}</option>`).join(""));
+    renderTiers(); renderHead(); apply();
+  }catch(e){
+    $("sub").textContent="";
+    $("empty").hidden=false;
+    $("empty").textContent="עדיין אין תוצאות. הסריקה הראשונה לוקחת כ-20–40 דקות; רענן את הדף אחרי שהיא מסתיימת.";
+  }
+}
+
+function renderTiers(){
+  const c={green:0,yellow:0,watch:0,all:ALL.length};
+  ALL.forEach(s=>{if(c[s.tier]!=null)c[s.tier]++});
+  $("tiers").innerHTML = Object.entries(TIERS).map(([k,v])=>
+    `<button class="tier ${k}" data-t="${k}" aria-pressed="${st.tier===k}"><b class="num">${c[k].toLocaleString("he-IL")}</b><span class="lbl">${v.name}</span><span>${v.hint}</span></button>`).join("");
+  $("tiers").querySelectorAll("button").forEach(b=>b.onclick=()=>{st.tier=b.dataset.t;shown=100;renderTiers();apply()});
+}
+
+function renderHead(){
+  $("thead").innerHTML = COLS.map((c,i)=>`<th data-i="${i}" ${c.k===st.key?`aria-sort="${st.dir<0?"descending":"ascending"}"`:""}>${c.l}</th>`).join("");
+  $("thead").querySelectorAll("th").forEach(th=>th.onclick=()=>{
+    const c=COLS[+th.dataset.i]; if(!c.sort) return;
+    if(st.key===c.k) st.dir*=-1; else {st.key=c.k; st.dir=(c.k==="pfcf"||c.k==="pe"||c.k==="flags")?1:-1;}
+    renderHead(); apply();
+  });
+}
+
+function apply(){
+  const q=$("q").value.trim().toLowerCase(), sec=$("sector").value, tech=$("tech").value, dd=+$("dd").value;
+  const onlyNew=$("onlynew").checked, noRed=$("nored").checked;
+  view = ALL.filter(s=>
+    (st.tier==="all"||s.tier===st.tier) && (!sec||s.sector===sec) && (!tech||s.tech.state===tech) &&
+    (s.dd52??0)>=dd && (!onlyNew||s.new) && (!noRed||!s.red.length) &&
+    (!q||s.t.toLowerCase().includes(q)||s.name.toLowerCase().includes(q)));
+  const c=COLS.find(c=>c.k===st.key);
+  view.sort((a,b)=>{const x=c.sort(a),y=c.sort(b); if(x==null&&y==null)return 0; if(x==null)return 1; if(y==null)return -1; return (x>y?1:x<y?-1:0)*st.dir;});
+  renderRows();
+}
+
+function renderRows(){
+  $("count").textContent = `${view.length.toLocaleString("he-IL")} תוצאות`;
+  $("empty").hidden = view.length>0;
+  if(!view.length) $("empty").textContent="אין מניות שמתאימות לסינון. נסה להרחיב אחד המסננים.";
+  $("rows").innerHTML = view.slice(0,shown).map((s,i)=>`<tr data-t="${esc(s.t)}" tabindex="0">
+    <td class="mut num">${i+1}</td>
+    <td><span class="dot ${s.tier}"></span><span class="tk ltr">${esc(s.t)}</span>${s.new?'<span class="new">חדש</span>':""}<span class="nm">${esc(s.name)}</span></td>
+    <td><div class="score"><b class="num">${s.score.toFixed(0)}</b>${bar(s)}</div></td>
+    <td>${pct(s.dd52)}</td>
+    <td class="${s.mos>0?"pos":"neg"}">${pct(s.mos)}</td>
+    <td>${n1(s.pfcf)}</td>
+    <td>${n1(s.pe)}</td>
+    <td>${s.roic!=null&&s.roic>1?'מעל 100%':pct(s.roic)}</td>
+    <td>${pct(s.rev_g,1)}</td>
+    <td class="tech">${TECH[s.tech.state]}</td>
+    <td class="flags">${s.red.length?`<span class="r">${s.red.length} אדומים</span> `:""}${s.yellow.length?`<span class="y">${s.yellow.length} צהובים</span>`:""}${!s.red.length&&!s.yellow.length?'<span class="mut">נקי</span>':""}</td>
+  </tr>`).join("");
+  $("more").hidden = view.length<=shown;
+  $("rows").querySelectorAll("tr").forEach(tr=>{
+    tr.onclick=()=>openDrawer(tr.dataset.t);
+    tr.onkeydown=e=>{if(e.key==="Enter")openDrawer(tr.dataset.t)};
+  });
+}
+
+function spark(label, vals, fmt){
+  const v=vals.map(x=>x==null?null:+x), ok=v.filter(x=>x!=null);
+  if(ok.length<2) return `<div class="spark"><div><span>${label}</span><span>—</span></div></div>`;
+  const mn=Math.min(...ok,0), mx=Math.max(...ok), W=200, H=46, p=4;
+  const xs=i=>p+i*(W-2*p)/(v.length-1), ys=x=>H-p-(x-mn)/((mx-mn)||1)*(H-2*p);
+  const pts=v.map((x,i)=>x==null?null:`${xs(i).toFixed(1)},${ys(x).toFixed(1)}`).filter(Boolean).join(" ");
+  const zero=mn<0?`<line x1="0" x2="${W}" y1="${ys(0)}" y2="${ys(0)}" stroke="var(--line)" stroke-dasharray="3 3"/>`:"";
+  const last=ok[ok.length-1];
+  return `<div class="spark"><div><span>${label}</span><span class="ltr num">${fmt(last)}</span></div>
+    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true" style="direction:ltr">${zero}<polyline points="${pts}" fill="none" stroke="var(--q)" stroke-width="2" vector-effect="non-scaling-stroke"/></svg></div>`;
+}
+
+function checks(title, list, score, color){
+  const ic={1:["✓","s1"],0.5:["½","s05"],0:["✗","s0"]};
+  return `<section class="blk"><h3><span style="color:${color}">${title}</span><small class="num">${score==null?"—":score.toFixed(0)+"/100"}</small></h3>
+  <table class="chk">${list.map(c=>{const [a,cl]=c.s==null?["–","sn"]:ic[c.s];
+    return `<tr><td class="${cl}">${a}</td><td>${esc(c.l)}</td><td><bdi class="num">${esc(c.v)}</bdi></td></tr>`}).join("")}</table></section>`;
+}
+
+function openDrawer(t){
+  const s=ALL.find(x=>x.t===t); if(!s) return;
+  const S=s.series, yrs=S.fy.length?`${S.fy[0]}–${S.fy[S.fy.length-1]}`:"";
+  const tierName=TIERS[s.tier]?TIERS[s.tier].name:(s.tier==="nodata"?"חסר מידע":"מחוץ לרמות");
+  $("drawer").innerHTML = `
+    <div class="dhead"><div><h2><span class="ltr">${esc(s.t)}</span></h2><div class="mut">${esc(s.name)}</div></div>
+      <button class="close" id="x" aria-label="סגירה">✕</button></div>
+    <div class="kv">
+      <span>מחיר <b class="ltr num">$${s.price.toLocaleString("en-US")}</b></span>
+      <span>שווי שוק <b class="ltr num">$${s.cap.toFixed(1)}B</b></span>
+      <span>${esc(s.sector)}</span><span>${tierName}</span>
+      <span>דוחות עד <b class="ltr num">${esc(s.data_to)}</b></span>
+    </div>
+    <div class="score big"><b class="num" style="font-size:30px">${s.score.toFixed(0)}</b>${bar(s)}</div>
+    <div class="legend"><span style="--c:var(--q)">איכות ${s.q??"—"}</span><span style="--c:var(--v)">תמחור ${s.v??"—"}</span><span style="--c:var(--d)">ירידה ${s.d??"—"}</span></div>
+    <div class="kv" style="margin-top:12px">
+      <span>מצב טכני <b>${TECH[s.tech.state]}</b></span>
+      <span>RSI <b class="ltr num">${s.tech.rsi??"—"}</b></span>
+      <span>${s.tech.above200?"מעל":"מתחת ל"}ממוצע 200 יום</span>
+    </div>
+    ${s.red.length?`<div class="flagbox r"><b>דגלים אדומים</b><ul>${s.red.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>`:""}
+    ${s.yellow.length?`<div class="flagbox y"><b>לבדוק</b><ul>${s.yellow.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>`:""}
+    ${checks("איכות החברה", s.checks.q, s.q, "var(--q)")}
+    ${checks("תמחור", s.checks.v, s.v, "var(--v)")}
+    ${checks("אופי הירידה", s.checks.d, s.d, "var(--d)")}
+    <section class="blk"><h3><span>מגמות ${yrs}</span></h3><div class="sparks">
+      ${spark("הכנסות ($B)", S.rev, x=>x.toFixed(1))}
+      ${spark("EPS", S.eps, x=>x.toFixed(2))}
+      ${spark("FCF ($B)", S.fcf, x=>x.toFixed(2))}
+      ${spark("Operating Margin", S.om, x=>(x*100).toFixed(1)+"%")}
+    </div></section>
+    <section class="blk manual"><h3><span>בדיקה ידנית לפני החלטה</span></h3>
+      <ul>
+        <li>למה המניה ירדה: סנטימנט, פאניקה, רוטציה, או בעיה מבנית?</li>
+        <li>האם ה-Moat עדיין שלם ונתח השוק יציב?</li>
+        <li>האם יש תחרות חדשה, שינוי רגולטורי או טכנולוגי שמאיים על המודל?</li>
+        <li>איך ההנהלה הקצתה הון בשנים האחרונות?</li>
+      </ul>
+      <div class="links">
+        <a href="https://news.google.com/search?q=${encodeURIComponent(s.t+" stock")}" target="_blank" rel="noopener">חדשות</a>
+        <a href="https://finance.yahoo.com/quote/${encodeURIComponent(s.t)}" target="_blank" rel="noopener">Yahoo Finance</a>
+        <a href="https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${s.cik}&type=10-K" target="_blank" rel="noopener">דוחות SEC</a>
+      </div>
+    </section>`;
+  $("drawer").classList.add("open"); $("scrim").classList.add("open");
+  $("drawer").setAttribute("aria-hidden","false"); $("drawer").scrollTop=0;
+  $("x").onclick=closeDrawer; $("x").focus();
+}
+function closeDrawer(){ $("drawer").classList.remove("open"); $("scrim").classList.remove("open"); $("drawer").setAttribute("aria-hidden","true"); }
+$("scrim").onclick=closeDrawer;
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeDrawer()});
+["q","sector","tech","dd","onlynew","nored"].forEach(id=>$(id).addEventListener("input",()=>{shown=100;apply()}));
+$("more").onclick=()=>{shown+=100;renderRows()};
+load();
+</script>
+</body>
+</html>
