@@ -1,0 +1,72 @@
+name: Stock scan
+
+on:
+  schedule:
+    - cron: "15 6 * * 2-6"    # לילה: רענון דוחות מלא + סריקה
+    - cron: "0 14 * * 1-5"    # אחרי פתיחת המסחר בארה"ב
+    - cron: "30 17 * * 1-5"   # אמצע יום מסחר
+    - cron: "30 20 * * 1-5"   # לקראת סגירה
+  workflow_dispatch:
+    inputs:
+      full:
+        description: "רענון מלא של כל הדוחות"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: scan
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Restore saved data
+        uses: actions/cache/restore@v4
+        with:
+          path: data
+          key: data-${{ github.run_id }}
+          restore-keys: data-
+
+      - name: Run scanner
+        env:
+          FULL: ${{ github.event.schedule == '15 6 * * 2-6' || inputs.full == true }}
+        run: python screener.py
+
+      - name: Save data
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: data
+          key: data-${{ github.run_id }}
+
+      - name: Build site
+        run: |
+          mkdir -p site
+          cp index.html site/
+          cp data/results.json site/
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@v4
