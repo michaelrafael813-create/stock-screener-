@@ -51,9 +51,32 @@ CONFIG = {
     "fundamentals_max_age_hours": 20,
 }
 
-UA_EMAIL = os.environ.get("SEC_CONTACT") or f"{os.environ.get('GITHUB_REPOSITORY_OWNER', 'screener')}@users.noreply.github.com"
+# ה-SEC דורש שם ומייל אמיתיים של מי שמפעיל את הסורק
+CONTACT_NAME = "Michael Rafael"
+CONTACT_EMAIL = os.environ.get("SEC_CONTACT") or "mikeyrafale480@gmail.com"
 SEC = requests.Session()
-SEC.headers.update({"User-Agent": f"Personal Stock Screener {UA_EMAIL}", "Accept-Encoding": "gzip, deflate"})
+SEC.headers.update({"User-Agent": f"{CONTACT_NAME} {CONTACT_EMAIL}", "Accept-Encoding": "gzip, deflate"})
+
+
+def sec_json(url, tries=4):
+    """בקשה ל-SEC עם ניסיונות חוזרים והודעת שגיאה ברורה."""
+    last = ""
+    for attempt in range(tries):
+        try:
+            r = SEC.get(url, timeout=60)
+            if r.status_code == 200:
+                try:
+                    return r.json()
+                except ValueError:
+                    last = f"תשובה לא תקינה: {r.text[:200]!r}"
+            elif r.status_code == 404:
+                return None
+            else:
+                last = f"קוד {r.status_code}: {r.text[:200]!r}"
+        except Exception as e:
+            last = repr(e)
+        time.sleep(3 + attempt * 5)
+    raise RuntimeError(f"ה-SEC לא ענה עבור {url} — {last}")
 
 FULL = os.environ.get("FULL", "").lower() == "true"
 MAX_TICKERS = int(os.environ.get("MAX_TICKERS", "0") or 0)
@@ -94,7 +117,7 @@ def fetch_universe():
         except Exception:
             return None
 
-    tick = SEC.get("https://www.sec.gov/files/company_tickers.json", timeout=60).json()
+    tick = sec_json("https://www.sec.gov/files/company_tickers.json")
     cik_of = {v["ticker"].upper(): int(v["cik_str"]) for v in tick.values()}
 
     by_cik = {}
@@ -313,18 +336,12 @@ def refresh_fundamentals(universe):
     out = dict(old["by_ticker"])
     for i, u in enumerate(todo):
         url = f"https://data.sec.gov/api/xbrl/companyfacts/CIK{u['cik']:010d}.json"
-        facts = None
-        for attempt in range(4):
-            try:
-                r = SEC.get(url, timeout=60)
-                if r.status_code == 200:
-                    facts = r.json()
-                    break
-                if r.status_code == 404:
-                    break
-                time.sleep(2 + attempt * 3)
-            except Exception:
-                time.sleep(2 + attempt * 3)
+        try:
+            facts = sec_json(url, tries=3)
+        except RuntimeError as e:
+            facts = None
+            if i < 3:
+                log("  ", e)
         time.sleep(0.12)  # מגבלת ה-SEC: עד 10 בקשות בשנייה
         if facts:
             try:
