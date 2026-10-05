@@ -205,7 +205,7 @@ footer{max-width:1280px;margin:0 auto 30px;padding:0 20px;color:var(--muted);fon
 </div>
 
 <div id="view-pat" hidden>
-  <p class="note">סריקה טכנית עצמאית של כל המניות, בלי קשר לקריטריונים של ה-Dip ובלי השפעה על הציון. הזיהוי אוטומטי ולכן משוער — תמיד הסתכל על הגרף לפני שאתה מסיק משהו.</p>
+  <p class="note">סריקה טכנית עצמאית של כל המניות, בלי קשר לקריטריונים של ה-Dip ובלי השפעה על הציון. הזיהוי אוטומטי ולכן משוער — תמיד הסתכל על הגרף לפני שאתה מסיק משהו. בגרף: כחול = מחיר, אפור = ממוצע 150, כתום מקווקו = נקודת הפריצה.</p>
   <div class="tools">
     <div class="chips" id="patchips"></div>
   </div>
@@ -216,12 +216,19 @@ footer{max-width:1280px;margin:0 auto 30px;padding:0 20px;color:var(--muted);fon
       <option value="breakout">רק כאלה שפרצו</option>
       <option value="near">רק קרובות לפריצה</option>
     </select>
+    <select id="p150" aria-label="מרחק מממוצע 150">
+      <option value="">כל מרחק מממוצע 150</option>
+      <option value="5">עד 5% מממוצע 150</option>
+      <option value="10">עד 10% מממוצע 150</option>
+      <option value="20">עד 20% מממוצע 150</option>
+    </select>
+    <label class="toggle"><input type="checkbox" id="p150up"> ממוצע 150 עולה</label>
     <label class="toggle"><input type="checkbox" id="pdip"> רק מניות שגם ירוקות/צהובות ב-Dip</label>
     <span class="count" id="pcount"></span>
   </div>
   <div class="wrap">
     <div class="tablebox"><table>
-      <thead><tr><th>מניה</th><th>תבניות</th><th>מרחק מנקודת הפריצה</th><th>ווליום יחסי</th><th>160 ימי מסחר</th><th>ציון Dip</th></tr></thead>
+      <thead><tr><th>מניה</th><th>תבניות</th><th>מרחק מנקודת הפריצה</th><th>ווליום יחסי</th><th>מרחק מממוצע 150</th><th>160 ימי מסחר</th><th>ציון Dip</th></tr></thead>
       <tbody id="prows"></tbody>
     </table><div class="empty" id="pempty" hidden>אין מניות שמתאימות לסינון.</div></div>
   </div>
@@ -442,18 +449,22 @@ function renderPatChips(){
   $("patchips").querySelectorAll("button").forEach(b=>b.onclick=()=>{pk=b.dataset.k;renderPatChips();applyPat()});
 }
 function mini(p){
-  const c=p.chart, piv=Math.max(...p.pats.map(x=>x.pivot).filter(x=>x)), mn=Math.min(...c,piv), mx=Math.max(...c,piv);
+  const c=p.chart, piv=Math.max(...p.pats.map(x=>x.pivot).filter(x=>x)), ml=(p.ma150_line||[]).filter(x=>x!=null);
+  const mn=Math.min(...c,piv,...ml), mx=Math.max(...c,piv,...ml);
   const W=150,H=40, xs=i=>i*(W-2)/(c.length-1)+1, ys=v=>H-2-(v-mn)/((mx-mn)||1)*(H-4);
   const pts=c.map((v,i)=>`${xs(i).toFixed(1)},${ys(v).toFixed(1)}`).join(" ");
   return `<svg class="mini" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="direction:ltr" aria-hidden="true">
     <line x1="0" x2="${W}" y1="${ys(piv)}" y2="${ys(piv)}" stroke="var(--amber)" stroke-dasharray="4 3" vector-effect="non-scaling-stroke"/>
+    ${ml.length?`<polyline points="${(p.ma150_line||[]).map((v,i)=>v==null?null:`${xs(i).toFixed(1)},${ys(v).toFixed(1)}`).filter(Boolean).join(" ")}" fill="none" stroke="var(--muted)" stroke-width="1.2" opacity=".8" vector-effect="non-scaling-stroke"/>`:""}
     <polyline points="${pts}" fill="none" stroke="var(--q)" stroke-width="1.6" vector-effect="non-scaling-stroke"/></svg>`;
 }
 function applyPat(){
   const q=$("pq").value.trim().toLowerCase(), st=$("pst").value, dip=$("pdip").checked;
+  const m150=+$("p150").value, up150=$("p150up").checked;
   const v=PATS.filter(p=>{
     const xs=p.pats.filter(x=>(!pk||x.k===pk)&&(!st||x.st===st));
-    return xs.length && (!dip||p.tier==="green"||p.tier==="yellow") && (!q||p.t.toLowerCase().includes(q)||p.name.toLowerCase().includes(q));
+    return xs.length && (!dip||p.tier==="green"||p.tier==="yellow") &&
+      (!m150||(p.ma150!=null&&Math.abs(p.ma150)*100<=m150)) && (!up150||p.ma150_up) && (!q||p.t.toLowerCase().includes(q)||p.name.toLowerCase().includes(q));
   });
   $("pcount").textContent=`${v.length.toLocaleString("he-IL")} מניות`;
   $("pempty").hidden=v.length>0;
@@ -464,6 +475,7 @@ function applyPat(){
       <td>${p.pats.map(x=>`<span class="badge ${x.st==="breakout"?"bo":""}">${esc(x.n)}${x.st==="breakout"?" · פרצה":" · קרובה"}</span>`).join("<br>")}</td>
       <td class="${main.dist>=0?"pos":""}">${pct(main.dist,1)}</td>
       <td>${p.vr==null?'<span class="mut">—</span>':`<span class="ltr num ${p.vr>=1.5?"pos":""}">${p.vr.toFixed(1)}×</span>`}</td>
+      <td>${p.ma150==null?'<span class="mut">—</span>':`<span class="ltr num ${Math.abs(p.ma150)<=0.10?"pos":p.ma150>0.25?"neg":""}">${(p.ma150>=0?"+":"")+(p.ma150*100).toFixed(1)}%</span> <span class="mut" title="כיוון הממוצע">${p.ma150_up?"↗":"↘"}</span>`}</td>
       <td>${mini(p)}</td>
       <td>${p.score==null?'<span class="mut">—</span>':`<span class="dot ${p.tier}"></span><span class="num">${p.score.toFixed(0)}</span>`}</td>
     </tr>`}).join("");
@@ -472,7 +484,7 @@ function applyPat(){
     tr.onclick=go; tr.onkeydown=e=>{if(e.key==="Enter")go()};
   });
 }
-["pq","pst","pdip"].forEach(id=>$(id).addEventListener("input",applyPat));
+["pq","pst","pdip","p150","p150up"].forEach(id=>$(id).addEventListener("input",applyPat));
 
 // ---------- יומן ----------
 let JR=null;

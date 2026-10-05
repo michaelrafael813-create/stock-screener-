@@ -974,6 +974,19 @@ def chart_points(close, days=160, pts=80):
     return [round(float(c[i]), 2) for i in idx]
 
 
+def ma150_info(close, days=160, pts=80):
+    """מרחק המחיר מממוצע 150 יום, כיוון הממוצע, והקו לגרף."""
+    if len(close) < 175:
+        return None, None, None
+    m = close.rolling(150).mean()
+    dist = float(close.iloc[-1] / m.iloc[-1] - 1)
+    rising = bool(m.iloc[-1] > m.iloc[-21])
+    mv = m.values[-days:]
+    idx = np.linspace(0, len(mv) - 1, min(pts, len(mv))).astype(int)
+    line = [None if not math.isfinite(mv[i]) else round(float(mv[i]), 2) for i in idx]
+    return round(dist, 4), rising, line
+
+
 # ===================================================================
 #  4ג. יומן ביצועים חודשי
 # ===================================================================
@@ -1094,6 +1107,8 @@ def main():
                          "cap": round(u["cap"] / 1e9, 2), "tier": r.get("tier"), "score": r.get("score"),
                          "vr": vol_ratio(vols[t].values.astype(float)) if t in vols else None,
                          "pats": pats, "chart": chart_points(closes[t])})
+        d150, up150, line150 = ma150_info(closes[t])
+        patterns[-1].update({"ma150": d150, "ma150_up": up150, "ma150_line": line150})
     patterns.sort(key=lambda p: (0 if any(x["st"] == "breakout" for x in p["pats"]) else 1, -(p["vr"] or 0)))
     log(f"תבניות: {len(patterns)} מניות")
 
