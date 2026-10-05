@@ -25,7 +25,7 @@ DATA.mkdir(exist_ok=True)
 #  הגדרות — כאן משנים ספים בלי לגעת בשאר הקוד
 # ===================================================================
 CONFIG = {
-    "min_market_cap": 2_000_000_000,
+    "min_market_cap": 1_000_000_000,
     "years": 5,                 # תקופת מדידה בסיסית
     "recent_years": 3,          # בדיקת מגמה טרייה
     # איכות
@@ -360,8 +360,9 @@ def refresh_fundamentals(universe):
 #  3. מחירים
 # ===================================================================
 def fetch_prices(tickers):
+    """מחזיר (מחירי סגירה, מחזורי מסחר) לכל מניה."""
     import yfinance as yf
-    out = {}
+    out, vols = {}, {}
     for i in range(0, len(tickers), 80):
         chunk = tickers[i:i + 80]
         df = None
@@ -383,11 +384,18 @@ def fetch_prices(tickers):
                     s.index = s.index.tz_localize(None)
                 if len(s) > 60:
                     out[t] = s
+                    try:
+                        v = (df[t]["Volume"] if isinstance(df.columns, pd.MultiIndex) else df["Volume"]).reindex(s.index)
+                        if getattr(v.index, "tz", None) is not None:
+                            v.index = v.index.tz_localize(None)
+                        vols[t] = v.fillna(0)
+                    except Exception:
+                        pass
             except Exception:
                 pass
         time.sleep(1.5)
         log(f"  מחירים: {min(i + 80, len(tickers))}/{len(tickers)}")
-    return out
+    return out, vols
 
 
 # ===================================================================
@@ -734,6 +742,281 @@ def compute(u, F, s):
     }
 
 
+# ===================================================================
+#  4ב. תבניות גרפיות (לא משפיעות על הציון)
+# ===================================================================
+def swings(c, k=5):
+    """אינדקסים של שיאים ושפלים מקומיים."""
+    hi, lo = [], []
+    for i in range(k, len(c) - k):
+        w = c[i - k:i + k + 1]
+        if c[i] == w.max() and (not hi or i - hi[-1] > 1):
+            hi.append(i)
+        if c[i] == w.min() and (not lo or i - lo[-1] > 1):
+            lo.append(i)
+    return hi, lo
+
+
+def vol_ratio(v, days=5):
+    """המחזור הגבוה ב-days הימים האחרונים ביחס לממוצע 50 יום."""
+    if v is None or len(v) < 60:
+        return None
+    avg = float(np.mean(v[-55:-5]))
+    if avg <= 0:
+        return None
+    return round(float(np.max(v[-days:])) / avg, 2)
+
+
+def _status(c, pivot):
+    """פרצה = מעל הפיבוט, פרצה ב-10 הימים האחרונים ולא רחוק ממנו. קרובה = עד 5% מתחת."""
+    price = c[-1]
+    dist = price / pivot - 1
+    if dist > 0:
+        if dist <= 0.06 and np.min(c[-11:-1]) <= pivot * 1.005:
+            return "breakout", dist
+        return None, dist
+    if dist >= -0.05:
+        return "near", dist
+    return None, dist
+
+
+def _mk(key, name, c, pivot):
+    st, dist = _status(c, pivot)
+    if not st:
+        return None
+    return {"k": key, "n": name, "st": st, "pivot": round(float(pivot), 2), "dist": round(float(dist), 4)}
+
+
+def pat_cup_handle(c):
+    n = len(c)
+    if n < 160:
+        return None
+    rr = n - 40 + int(np.argmax(c[n - 40:n - 3]))
+    h = n - 1 - rr
+    if not 5 <= h <= 35:
+        return None
+    rim = c[rr]
+    hlow = float(np.min(c[rr:]))
+    if not 0.03 <= 1 - hlow / rim <= 0.15:
+        return None
+    lo_i, hi_i = max(0, rr - 325), rr - 35
+    if hi_i - lo_i < 10:
+        return None
+    lp = lo_i + int(np.argmax(c[lo_i:hi_i]))
+    left = c[lp]
+    if not 0.90 * left <= rim <= 1.05 * left:
+        return None
+    bi = lp + int(np.argmin(c[lp:rr + 1]))
+    bottom = c[bi]
+    if not 0.12 <= 1 - bottom / left <= 0.40:
+        return None
+    if not 0.2 <= (bi - lp) / (rr - lp) <= 0.8:
+        return None
+    if hlow < bottom + 0.5 * (left - bottom):
+        return None
+    pre = c[max(0, lp - 120):lp]
+    if len(pre) > 20 and left < np.min(pre) * 1.15:
+        return None
+    return _mk("cup", "ספל וידית", c, rim)
+
+
+def pat_flat_base(c):
+    n = len(c)
+    for L in range(65, 24, -5):
+        if n < L + 70:
+            continue
+        base = c[-L - 1:-1]
+        top, bot = float(np.max(base)), float(np.min(base))
+        if top / bot - 1 > 0.15:
+            continue
+        start = n - 1 - L
+        pre = c[max(0, start - 60):start]
+        if len(pre) < 20 or c[start] < np.min(pre) * 1.20:
+            continue
+        return _mk("flat", "בסיס שטוח", c, top)
+    return None
+
+
+def pat_bull_flag(c, v):
+    n = len(c)
+    for f in range(5, 21):
+        p = n - 1 - f
+        if p < 30:
+            break
+        top = c[p]
+        if np.max(c[p:max(p + 1, n - 3)]) > top * 1.005:
+            continue
+        lo_i = p - 20 + int(np.argmin(c[p - 20:p]))
+        pole_lo = c[lo_i]
+        if p - lo_i < 3 or top < np.max(c[lo_i:p + 1]) or top / pole_lo - 1 < 0.20:
+            continue
+        retr = (top - np.min(c[p:])) / (top - pole_lo)
+        if not 0.05 <= retr <= 0.5:
+            continue
+        if v is not None and len(v) == n and np.mean(v[p + 1:]) >= np.mean(v[lo_i:p + 1]):
+            continue
+        return _mk("flag", "דגל שורי", c, top)
+    return None
+
+
+def pat_asc_triangle(c):
+    for W in (60, 90):
+        if len(c) < W + 10:
+            continue
+        w = c[-W:]
+        hi, lo = swings(w, 4)
+        hi = [i for i in hi if i < W - 3]
+        if len(hi) < 2 or len(lo) < 2:
+            continue
+        R = max(w[i] for i in hi)
+        tops = [i for i in hi if w[i] >= R * 0.97]
+        if len(tops) < 2 or tops[-1] - tops[0] < 15:
+            continue
+        lows = [w[i] for i in lo if i > tops[0] - 10]
+        if len(lows) < 2 or not all(b > a for a, b in zip(lows, lows[1:])):
+            continue
+        if lows[-1] < lows[0] * 1.03 or lows[0] > R * 0.95:
+            continue
+        return _mk("tri", "משולש עולה", c, R)
+    return None
+
+
+def pat_high52(c):
+    if len(c) < 265:
+        return None
+    prev = float(np.max(c[-260:-5]))
+    if np.max(c[-5:]) > prev and c[-1] >= prev * 0.98:
+        return {"k": "hi52", "n": "פריצת שיא 52 שבועות", "st": "breakout", "pivot": round(prev, 2), "dist": round(float(c[-1] / prev - 1), 4)}
+    return None
+
+
+def pat_golden(c):
+    if len(c) < 215:
+        return None
+    s = pd.Series(c)
+    s50, s200 = s.rolling(50).mean().values, s.rolling(200).mean().values
+    if s50[-1] > s200[-1]:
+        for d in range(1, 11):
+            if s50[-1 - d] <= s200[-1 - d]:
+                return {"k": "golden", "n": "Golden Cross", "st": "breakout", "pivot": round(float(s200[-1]), 2),
+                        "dist": round(float(c[-1] / s200[-1] - 1), 4), "days": d}
+    return None
+
+
+def tech_patterns(close, vol):
+    c = close.values.astype(float)
+    v = vol.values.astype(float) if vol is not None else None
+    found = []
+    for fn in (pat_cup_handle, pat_flat_base, pat_asc_triangle, pat_high52, pat_golden):
+        try:
+            x = fn(c)
+            if x:
+                found.append(x)
+        except Exception:
+            pass
+    try:
+        x = pat_bull_flag(c, v)
+        if x:
+            found.append(x)
+    except Exception:
+        pass
+    return found
+
+
+def bottom_patterns(close, vol):
+    """תצורות של סוף ירידה — לרשימת ה-Buy the Dip."""
+    c = close.values.astype(float)
+    v = vol.values.astype(float) if vol is not None else None
+    out = []
+    n = len(c)
+    if n < 160:
+        return out
+    hi1y = float(np.max(c[-252:]))
+    w = c[-150:]
+    hi, lo = swings(w, 5)
+    # תחתית כפולה
+    done = False
+    for j in reversed(lo):
+        if done or j < len(w) - 60:
+            break
+        for i in lo:
+            if j - i < 15 or abs(w[j] / w[i] - 1) > 0.04:
+                continue
+            mid = float(np.max(w[i:j]))
+            low = min(w[i], w[j])
+            if mid >= max(w[i], w[j]) * 1.08 and low <= hi1y * 0.85 and c[-1] >= low * 1.03:
+                out.append({"k": "dbl", "n": "תחתית כפולה" + (" (מאושרת)" if c[-1] > mid else "")})
+                done = True
+                break
+    # שפלים עולים
+    lows = [w[i] for i in lo if i >= len(w) - 120]
+    if len(lows) >= 3 and lows[-1] > lows[-2] * 1.02 > 0 and lows[-2] > lows[-3] * 1.02 and c[-1] > lows[-1] and lows[-3] <= hi1y * 0.85:
+        out.append({"k": "hl", "n": "שפלים עולים"})
+    # פריצה מבסיס עם ווליום
+    base = c[-35:-5]
+    if np.max(c[-5:]) > np.max(base) and np.max(base) / np.min(base) - 1 <= 0.15 and c[-60] > np.max(base) * 1.1:
+        vr = vol_ratio(v) if v is not None else None
+        if vr and vr >= 1.5:
+            out.append({"k": "base", "n": "פריצה מבסיס עם ווליום"})
+    # חזרה מעל ממוצע 200
+    s200 = pd.Series(c).rolling(200).mean().values
+    if n >= 340 and c[-1] > s200[-1]:
+        below = np.sum(c[-135:-15] < s200[-135:-15])
+        crossed = np.any(c[-15:-1] <= s200[-15:-1])
+        if below >= 60 and crossed:
+            out.append({"k": "ma200", "n": "חזרה מעל ממוצע 200"})
+    return out
+
+
+def chart_points(close, days=160, pts=80):
+    c = close.values[-days:]
+    idx = np.linspace(0, len(c) - 1, min(pts, len(c))).astype(int)
+    return [round(float(c[i]), 2) for i in idx]
+
+
+# ===================================================================
+#  4ג. יומן ביצועים חודשי
+# ===================================================================
+def load_journal():
+    path = DATA / "journal.json"
+    if path.exists():
+        return json.loads(path.read_text())
+    # גיבוי: היומן מתפרסם גם באתר, אז אם המטמון נמחק משחזרים משם
+    repo = os.environ.get("GITHUB_REPOSITORY", "")
+    if "/" in repo:
+        owner, name = repo.split("/", 1)
+        try:
+            r = requests.get(f"https://{owner.lower()}.github.io/{name}/journal.json", timeout=30)
+            if r.status_code == 200:
+                log("היומן שוחזר מהאתר")
+                return r.json()
+        except Exception:
+            pass
+    return {"snaps": []}
+
+
+def update_journal(j, results, patterns, closes, spy):
+    today = dt.date.today()
+    month = today.strftime("%Y-%m")
+    if spy is not None and not any(sn["month"] == month for sn in j["snaps"]):
+        j["snaps"].append({
+            "month": month, "date": today.isoformat(), "spy": round(spy, 2),
+            "stocks": [{"t": r["t"], "tier": r["tier"], "price": r["price"], "score": r["score"],
+                        "bottom": [b["k"] for b in r.get("bottom", [])]}
+                       for r in results if r["tier"] in ("green", "yellow")],
+            "pats": [{"t": p["t"], "p": [x["k"] for x in p["pats"]], "st": [x["st"] for x in p["pats"]], "price": p["price"]}
+                     for p in patterns],
+        })
+        log(f"נשמר צילום חודשי ליומן: {month}")
+    tickers = {x["t"] for sn in j["snaps"] for x in sn["stocks"] + sn["pats"]}
+    j["now"] = {t: round(float(closes[t].iloc[-1]), 2) for t in tickers if t in closes}
+    j["tier_now"] = {r["t"]: r["tier"] for r in results if r["t"] in tickers}
+    j["spy_now"] = None if spy is None else round(spy, 2)
+    j["updated"] = dt.datetime.utcnow().isoformat() + "Z"
+    return j
+
+
+
 def clean(o):
     """JSON תקין: NaN/אינסוף הופכים לריק."""
     if isinstance(o, dict):
@@ -756,9 +1039,14 @@ def main():
     if MAX_TICKERS:
         uni = uni[:MAX_TICKERS]
     fund = refresh_fundamentals(uni)
+    journal = load_journal()
     tickers = [u["t"] for u in uni if u["t"] in fund]
-    log(f"מוריד מחירים עבור {len(tickers)} מניות...")
-    prices = fetch_prices(tickers)
+    uni_t = {u["t"] for u in uni}
+    extra = sorted({x["t"] for sn in journal["snaps"] for x in sn["stocks"] + sn["pats"]} - set(tickers))
+    all_t = tickers + [t for t in uni_t if t not in fund] + extra + ["SPY"]
+    log(f"מוריד מחירים עבור {len(all_t)} מניות...")
+    closes, vols = fetch_prices(list(dict.fromkeys(all_t)))
+    spy = float(closes["SPY"].iloc[-1]) if "SPY" in closes else None
 
     state_path = DATA / "state.json"
     state = json.loads(state_path.read_text()) if state_path.exists() else {}
@@ -768,15 +1056,19 @@ def main():
     results, errors = [], 0
     for u in uni:
         t = u["t"]
-        if t not in fund or t not in prices:
+        if t not in fund or t not in closes:
             continue
         try:
-            r = compute(u, fund[t], prices[t])
+            r = compute(u, fund[t], closes[t])
         except Exception as e:
             errors += 1
             if errors <= 15:
                 log("  שגיאת חישוב", t, repr(e))
             continue
+        try:
+            r["bottom"] = bottom_patterns(closes[t], vols.get(t))
+        except Exception:
+            r["bottom"] = []
         prev = state.get(t)
         if prev is None or prev["tier"] != r["tier"]:
             improved = prev is None or rank[r["tier"]] > rank[prev["tier"]]
@@ -785,11 +1077,38 @@ def main():
         r["new"] = bool(state[t].get("up")) and r["tier"] in ("green", "yellow") and \
             (dt.date.today() - dt.date.fromisoformat(state[t]["since"])).days <= 2
         results.append(r)
-
     results.sort(key=lambda x: -x["score"])
+
+    # לשונית התבניות — כל המניות בביקום, בלי קשר לקריטריונים
+    by_t = {r["t"]: r for r in results}
+    patterns = []
+    for u in uni:
+        t = u["t"]
+        if t not in closes:
+            continue
+        pats = tech_patterns(closes[t], vols.get(t))
+        if not pats:
+            continue
+        r = by_t.get(t, {})
+        patterns.append({"t": t, "name": u["name"], "sector": u["sector"], "price": round(float(closes[t].iloc[-1]), 2),
+                         "cap": round(u["cap"] / 1e9, 2), "tier": r.get("tier"), "score": r.get("score"),
+                         "vr": vol_ratio(vols[t].values.astype(float)) if t in vols else None,
+                         "pats": pats, "chart": chart_points(closes[t])})
+    patterns.sort(key=lambda p: (0 if any(x["st"] == "breakout" for x in p["pats"]) else 1, -(p["vr"] or 0)))
+    log(f"תבניות: {len(patterns)} מניות")
+
     state_path.write_text(json.dumps(state))
-    out = {"generated": dt.datetime.utcnow().isoformat() + "Z", "count": len(results), "config": CONFIG, "stocks": results}
+    out = {"generated": dt.datetime.utcnow().isoformat() + "Z", "count": len(results), "config": CONFIG,
+           "stocks": results, "patterns": patterns}
     (DATA / "results.json").write_text(json.dumps(clean(out), ensure_ascii=False, separators=(",", ":"), allow_nan=False))
+
+    journal = clean(update_journal(journal, results, patterns, closes, spy))
+    jtxt = json.dumps(journal, ensure_ascii=False, separators=(",", ":"))
+    (DATA / "journal.json").write_text(jtxt)
+    site = Path("site")
+    site.mkdir(exist_ok=True)
+    (site / "journal.json").write_text(jtxt)
+
     tiers = {k: sum(1 for r in results if r["tier"] == k) for k in rank}
     log(f"סיום: {len(results)} מניות, {tiers}, שגיאות: {errors}, זמן: {(time.time() - t0) / 60:.1f} דק'")
     if not results:

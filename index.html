@@ -118,6 +118,28 @@ section.blk h3 small{color:var(--muted);font-weight:500}
 .manual li{margin:4px 0;font-size:13.5px}
 .links{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
 .links a{color:var(--blue);text-decoration:none;border:1px solid var(--line);border-radius:6px;padding:5px 10px;font-size:13px}
+.tabs{max-width:1280px;margin:4px auto 0;padding:0 20px;display:flex;gap:4px;border-bottom:1px solid var(--line);overflow-x:auto}
+.tabs button{border:0;background:none;padding:10px 14px;font-weight:600;color:var(--muted);border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap}
+.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--ink)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:6px 12px;cursor:pointer;font-size:13.5px}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--panel);border-color:var(--ink)}
+.badge{display:inline-block;font-size:12px;border-radius:4px;padding:1px 7px;margin:1px 0 1px 4px;background:var(--blue-bg);color:var(--blue);font-weight:600}
+.badge.bo{background:var(--green-bg);color:var(--green)}
+.badge.btm{background:var(--amber-bg);color:var(--amber)}
+.mini{display:block;width:150px;height:40px}
+.note{max-width:1280px;margin:10px auto 0;padding:0 20px;color:var(--muted);font-size:13px}
+.cards{display:grid;gap:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
+.card h3{margin:0 0 10px;font-size:17px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px}
+.card h3 small{color:var(--muted);font-weight:500;font-size:13px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.stat{border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.stat span{display:block;color:var(--muted);font-size:12.5px}
+.stat b{font-size:20px}
+.card details{margin-top:12px}
+.card summary{cursor:pointer;color:var(--blue);font-size:14px}
+.card table{min-width:640px}
 footer{max-width:1280px;margin:0 auto 30px;padding:0 20px;color:var(--muted);font-size:12.5px}
 @media (max-width:640px){
   header{padding-top:18px} h1{font-size:22px}
@@ -134,6 +156,13 @@ footer{max-width:1280px;margin:0 auto 30px;padding:0 20px;color:var(--muted);fon
   </div>
 </header>
 
+<nav class="tabs" role="tablist">
+  <button role="tab" data-v="dip" aria-selected="true">Buy the Dip</button>
+  <button role="tab" data-v="pat" aria-selected="false">תבניות טכניות</button>
+  <button role="tab" data-v="jr" aria-selected="false">יומן ביצועים</button>
+</nav>
+
+<div id="view-dip">
 <div class="tiers" id="tiers"></div>
 
 <div class="tools">
@@ -151,8 +180,15 @@ footer{max-width:1280px;margin:0 auto 30px;padding:0 20px;color:var(--muted);fon
     <option value="0.3">ירידה של 30% ומעלה</option>
     <option value="0.5">ירידה של 50% ומעלה</option>
   </select>
+  <select id="capf" aria-label="גודל חברה">
+    <option value="">כל הגדלים</option>
+    <option value="small">קטנות (1–2 מיליארד $)</option>
+    <option value="mid">בינוניות (2–10 מיליארד $)</option>
+    <option value="large">גדולות (מעל 10 מיליארד $)</option>
+  </select>
   <label class="toggle"><input type="checkbox" id="onlynew"> רק חדשות</label>
   <label class="toggle"><input type="checkbox" id="nored"> בלי דגלים אדומים</label>
+  <label class="toggle"><input type="checkbox" id="onlybtm"> רק עם תצורת תחתית</label>
   <span class="count" id="count"></span>
 </div>
 
@@ -165,6 +201,35 @@ footer{max-width:1280px;margin:0 auto 30px;padding:0 20px;color:var(--muted);fon
     <div class="empty" id="empty" hidden></div>
   </div>
   <button class="more" id="more" hidden>הצג עוד 100</button>
+</div>
+</div>
+
+<div id="view-pat" hidden>
+  <p class="note">סריקה טכנית עצמאית של כל המניות, בלי קשר לקריטריונים של ה-Dip ובלי השפעה על הציון. הזיהוי אוטומטי ולכן משוער — תמיד הסתכל על הגרף לפני שאתה מסיק משהו.</p>
+  <div class="tools">
+    <div class="chips" id="patchips"></div>
+  </div>
+  <div class="tools">
+    <input type="search" id="pq" placeholder="חיפוש לפי שם או סימול" aria-label="חיפוש תבניות">
+    <select id="pst" aria-label="סטטוס">
+      <option value="">פרצו + קרובות לפריצה</option>
+      <option value="breakout">רק כאלה שפרצו</option>
+      <option value="near">רק קרובות לפריצה</option>
+    </select>
+    <label class="toggle"><input type="checkbox" id="pdip"> רק מניות שגם ירוקות/צהובות ב-Dip</label>
+    <span class="count" id="pcount"></span>
+  </div>
+  <div class="wrap">
+    <div class="tablebox"><table>
+      <thead><tr><th>מניה</th><th>תבניות</th><th>מרחק מנקודת הפריצה</th><th>ווליום יחסי</th><th>160 ימי מסחר</th><th>ציון Dip</th></tr></thead>
+      <tbody id="prows"></tbody>
+    </table><div class="empty" id="pempty" hidden>אין מניות שמתאימות לסינון.</div></div>
+  </div>
+</div>
+
+<div id="view-jr" hidden>
+  <p class="note">בתחילת כל חודש הסורק שומר "צילום" של המניות הירוקות, הצהובות ושל מניות התבניות, עם המחיר שלהן באותו יום. כאן רואים מה קרה איתן מאז, לעומת S&amp;P 500.</p>
+  <div class="wrap"><div class="cards" id="jcards"></div></div>
 </div>
 
 <footer>
@@ -194,6 +259,7 @@ const COLS = [
   {k:"roic", l:"ROIC", sort:s=>s.roic},
   {k:"rev_g", l:"צמיחת הכנסות", sort:s=>s.rev_g},
   {k:"tech", l:"מצב טכני", sort:s=>({down:0,flat:1,up:2})[s.tech.state]},
+  {k:"btm", l:"תצורת תחתית", sort:s=>(s.bottom||[]).length},
   {k:"flags", l:"דגלים", sort:s=>s.red.length*10+s.yellow.length},
 ];
 let ALL=[], view=[], shown=100, st={tier:"all", key:"score", dir:-1};
@@ -215,10 +281,12 @@ async function load(){
     const data = await r.json();
     ALL = data.stocks;
     const t = new Date(data.generated);
-    $("sub").textContent = `עודכן ${t.toLocaleString("he-IL",{dateStyle:"short",timeStyle:"short"})} · ${data.count.toLocaleString("he-IL")} מניות בשווי שוק מעל 2 מיליארד $`;
+    const minCap = ((data.config&&data.config.min_market_cap)||2e9)/1e9;
+    $("sub").textContent = `עודכן ${t.toLocaleString("he-IL",{dateStyle:"short",timeStyle:"short"})} · ${data.count.toLocaleString("he-IL")} מניות בשווי שוק מעל ${minCap} מיליארד $`;
     const secs=[...new Set(ALL.map(s=>s.sector).filter(Boolean))].sort();
     $("sector").insertAdjacentHTML("beforeend", secs.map(s=>`<option>${esc(s)}</option>`).join(""));
-    renderTiers(); renderHead(); apply();
+    PATS = data.patterns||[];
+    renderTiers(); renderHead(); apply(); renderPatChips(); applyPat();
   }catch(e){
     $("sub").textContent="";
     $("empty").hidden=false;
@@ -245,10 +313,11 @@ function renderHead(){
 
 function apply(){
   const q=$("q").value.trim().toLowerCase(), sec=$("sector").value, tech=$("tech").value, dd=+$("dd").value;
-  const onlyNew=$("onlynew").checked, noRed=$("nored").checked;
+  const onlyNew=$("onlynew").checked, noRed=$("nored").checked, onlyBtm=$("onlybtm").checked, capf=$("capf").value;
+  const capOk=c=>!capf||(capf==="small"?c<2:capf==="mid"?c>=2&&c<10:c>=10);
   view = ALL.filter(s=>
     (st.tier==="all"||s.tier===st.tier) && (!sec||s.sector===sec) && (!tech||s.tech.state===tech) &&
-    (s.dd52??0)>=dd && (!onlyNew||s.new) && (!noRed||!s.red.length) &&
+    (s.dd52??0)>=dd && (!onlyNew||s.new) && (!noRed||!s.red.length) && (!onlyBtm||(s.bottom||[]).length) && capOk(s.cap) &&
     (!q||s.t.toLowerCase().includes(q)||s.name.toLowerCase().includes(q)));
   const c=COLS.find(c=>c.k===st.key);
   view.sort((a,b)=>{const x=c.sort(a),y=c.sort(b); if(x==null&&y==null)return 0; if(x==null)return 1; if(y==null)return -1; return (x>y?1:x<y?-1:0)*st.dir;});
@@ -270,6 +339,7 @@ function renderRows(){
     <td>${s.roic!=null&&s.roic>1?'מעל 100%':pct(s.roic)}</td>
     <td>${pct(s.rev_g,1)}</td>
     <td class="tech">${TECH[s.tech.state]}</td>
+    <td>${(s.bottom||[]).map(b=>`<span class="badge btm">${esc(b.n)}</span>`).join("")||'<span class="mut">—</span>'}</td>
     <td class="flags">${s.red.length?`<span class="r">${s.red.length} אדומים</span> `:""}${s.yellow.length?`<span class="y">${s.yellow.length} צהובים</span>`:""}${!s.red.length&&!s.yellow.length?'<span class="mut">נקי</span>':""}</td>
   </tr>`).join("");
   $("more").hidden = view.length<=shown;
@@ -318,6 +388,7 @@ function openDrawer(t){
       <span>RSI <b class="ltr num">${s.tech.rsi??"—"}</b></span>
       <span>${s.tech.above200?"מעל":"מתחת ל"}ממוצע 200 יום</span>
     </div>
+    ${(s.bottom||[]).length?`<div class="kv">תצורת תחתית: ${s.bottom.map(b=>`<span class="badge btm">${esc(b.n)}</span>`).join("")}</div>`:""}
     ${s.red.length?`<div class="flagbox r"><b>דגלים אדומים</b><ul>${s.red.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>`:""}
     ${s.yellow.length?`<div class="flagbox y"><b>לבדוק</b><ul>${s.yellow.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>`:""}
     ${checks("איכות החברה", s.checks.q, s.q, "var(--q)")}
@@ -349,9 +420,105 @@ function openDrawer(t){
 function closeDrawer(){ $("drawer").classList.remove("open"); $("scrim").classList.remove("open"); $("drawer").setAttribute("aria-hidden","true"); }
 $("scrim").onclick=closeDrawer;
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeDrawer()});
-["q","sector","tech","dd","onlynew","nored"].forEach(id=>$(id).addEventListener("input",()=>{shown=100;apply()}));
+["q","sector","tech","dd","capf","onlynew","nored","onlybtm"].forEach(id=>$(id).addEventListener("input",()=>{shown=100;apply()}));
 $("more").onclick=()=>{shown+=100;renderRows()};
-load();
+
+// ---------- לשוניות ----------
+function showView(v){
+  document.querySelectorAll(".tabs button").forEach(b=>b.setAttribute("aria-selected", b.dataset.v===v));
+  ["dip","pat","jr"].forEach(x=>$("view-"+x).hidden = x!==v);
+  if(v==="jr") loadJournal();
+  history.replaceState(null,"", v==="dip" ? location.pathname : "#"+v);
+}
+document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>showView(b.dataset.v));
+
+// ---------- תבניות ----------
+let PATS=[], pk="";
+const PNAMES={cup:"ספל וידית",flat:"בסיס שטוח",flag:"דגל שורי",tri:"משולש עולה",hi52:"שיא 52 שבועות",golden:"Golden Cross"};
+function renderPatChips(){
+  const cnt={}; PATS.forEach(p=>p.pats.forEach(x=>cnt[x.k]=(cnt[x.k]||0)+1));
+  $("patchips").innerHTML = `<button class="chip" data-k="" aria-pressed="${pk===""}">הכל (${PATS.length})</button>` +
+    Object.entries(PNAMES).map(([k,n])=>`<button class="chip" data-k="${k}" aria-pressed="${pk===k}">${n} (${cnt[k]||0})</button>`).join("");
+  $("patchips").querySelectorAll("button").forEach(b=>b.onclick=()=>{pk=b.dataset.k;renderPatChips();applyPat()});
+}
+function mini(p){
+  const c=p.chart, piv=Math.max(...p.pats.map(x=>x.pivot).filter(x=>x)), mn=Math.min(...c,piv), mx=Math.max(...c,piv);
+  const W=150,H=40, xs=i=>i*(W-2)/(c.length-1)+1, ys=v=>H-2-(v-mn)/((mx-mn)||1)*(H-4);
+  const pts=c.map((v,i)=>`${xs(i).toFixed(1)},${ys(v).toFixed(1)}`).join(" ");
+  return `<svg class="mini" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="direction:ltr" aria-hidden="true">
+    <line x1="0" x2="${W}" y1="${ys(piv)}" y2="${ys(piv)}" stroke="var(--amber)" stroke-dasharray="4 3" vector-effect="non-scaling-stroke"/>
+    <polyline points="${pts}" fill="none" stroke="var(--q)" stroke-width="1.6" vector-effect="non-scaling-stroke"/></svg>`;
+}
+function applyPat(){
+  const q=$("pq").value.trim().toLowerCase(), st=$("pst").value, dip=$("pdip").checked;
+  const v=PATS.filter(p=>{
+    const xs=p.pats.filter(x=>(!pk||x.k===pk)&&(!st||x.st===st));
+    return xs.length && (!dip||p.tier==="green"||p.tier==="yellow") && (!q||p.t.toLowerCase().includes(q)||p.name.toLowerCase().includes(q));
+  });
+  $("pcount").textContent=`${v.length.toLocaleString("he-IL")} מניות`;
+  $("pempty").hidden=v.length>0;
+  $("prows").innerHTML=v.slice(0,300).map(p=>{
+    const xs=p.pats.filter(x=>!pk||x.k===pk), main=xs[0];
+    return `<tr data-t="${esc(p.t)}" tabindex="0">
+      <td><span class="tk ltr">${esc(p.t)}</span><span class="nm">${esc(p.name)}</span></td>
+      <td>${p.pats.map(x=>`<span class="badge ${x.st==="breakout"?"bo":""}">${esc(x.n)}${x.st==="breakout"?" · פרצה":" · קרובה"}</span>`).join("<br>")}</td>
+      <td class="${main.dist>=0?"pos":""}">${pct(main.dist,1)}</td>
+      <td>${p.vr==null?'<span class="mut">—</span>':`<span class="ltr num ${p.vr>=1.5?"pos":""}">${p.vr.toFixed(1)}×</span>`}</td>
+      <td>${mini(p)}</td>
+      <td>${p.score==null?'<span class="mut">—</span>':`<span class="dot ${p.tier}"></span><span class="num">${p.score.toFixed(0)}</span>`}</td>
+    </tr>`}).join("");
+  $("prows").querySelectorAll("tr").forEach(tr=>{
+    const go=()=>{ if(ALL.find(s=>s.t===tr.dataset.t)) openDrawer(tr.dataset.t); else window.open("https://finance.yahoo.com/quote/"+encodeURIComponent(tr.dataset.t),"_blank","noopener"); };
+    tr.onclick=go; tr.onkeydown=e=>{if(e.key==="Enter")go()};
+  });
+}
+["pq","pst","pdip"].forEach(id=>$(id).addEventListener("input",applyPat));
+
+// ---------- יומן ----------
+let JR=null;
+const TN={green:"ירוקה",yellow:"צהובה",watch:"מעקב",other:"מחוץ לרמות",nodata:"חסר מידע"};
+async function loadJournal(){
+  if(JR) return;
+  try{ const r=await fetch("journal.json",{cache:"no-store"}); if(!r.ok) throw 0; JR=await r.json(); }
+  catch(e){ JR={snaps:[]}; }
+  renderJournal();
+}
+const ret=(a,b)=>a&&b?b/a-1:null;
+const avg=a=>{const v=a.filter(x=>x!=null);return v.length?v.reduce((x,y)=>x+y,0)/v.length:null};
+function stat(label,x,n){
+  return `<div class="stat"><span>${label}${n!=null?` (${n})`:""}</span><b class="${x==null?"mut":x>=0?"pos":"neg"}">${x==null?"—":`<span class="ltr num">${(x>=0?"+":"")+(x*100).toFixed(1)}%</span>`}</b></div>`;
+}
+function renderJournal(){
+  const S=(JR.snaps||[]).slice().reverse(), now=JR.now||{}, tn=JR.tier_now||{};
+  if(!S.length){ $("jcards").innerHTML=`<div class="card empty">הצילום הראשון יישמר בסריקה הבאה. מכאן והלאה יתווסף צילום חדש בתחילת כל חודש.</div>`; return; }
+  $("jcards").innerHTML=S.map(sn=>{
+    const r=x=>ret(x.price,now[x.t]);
+    const g=sn.stocks.filter(x=>x.tier==="green"), y=sn.stocks.filter(x=>x.tier==="yellow"), b=sn.stocks.filter(x=>x.bottom&&x.bottom.length);
+    const spy=ret(sn.spy,JR.spy_now);
+    const days=Math.round((Date.now()-new Date(sn.date))/864e5);
+    const rows=sn.stocks.map(x=>({...x,r:r(x)})).sort((a,b)=>(b.r??-9)-(a.r??-9));
+    const prow=sn.pats.map(x=>({...x,r:r(x)})).sort((a,b)=>(b.r??-9)-(a.r??-9));
+    return `<div class="card"><h3><span>צילום ${new Date(sn.date).toLocaleDateString("he-IL")}</span><small>${days<=0?"היום":days===1?"אתמול":`לפני ${days} ימים`}</small></h3>
+      <div class="stats">
+        ${stat("ירוקות", avg(g.map(r)), g.length)}
+        ${stat("צהובות", avg(y.map(r)), y.length)}
+        ${stat("עם תצורת תחתית", avg(b.map(r)), b.length)}
+        ${stat("תבניות טכניות", avg(sn.pats.map(r)), sn.pats.length)}
+        ${stat("S&P 500", spy)}
+      </div>
+      <details><summary>פירוט מניות ה-Dip</summary><div class="tablebox" style="margin-top:8px"><table>
+        <thead><tr><th>מניה</th><th>רמה אז</th><th>מחיר אז</th><th>מחיר עכשיו</th><th>שינוי</th><th>רמה עכשיו</th></tr></thead>
+        <tbody>${rows.map(x=>`<tr><td><span class="tk ltr">${esc(x.t)}</span></td><td><span class="dot ${x.tier}"></span>${TN[x.tier]}</td>
+          <td><span class="ltr num">$${x.price}</span></td><td>${now[x.t]?`<span class="ltr num">$${now[x.t]}</span>`:'<span class="mut">—</span>'}</td>
+          <td class="${x.r>=0?"pos":"neg"}">${pct(x.r,1)}</td><td>${tn[x.t]?`<span class="dot ${tn[x.t]}"></span>${TN[tn[x.t]]}`:'<span class="mut">—</span>'}</td></tr>`).join("")}</tbody></table></div></details>
+      <details><summary>פירוט מניות התבניות</summary><div class="tablebox" style="margin-top:8px"><table>
+        <thead><tr><th>מניה</th><th>תבניות אז</th><th>מחיר אז</th><th>מחיר עכשיו</th><th>שינוי</th></tr></thead>
+        <tbody>${prow.map(x=>`<tr><td><span class="tk ltr">${esc(x.t)}</span></td><td>${x.p.map(k=>`<span class="badge">${PNAMES[k]||k}</span>`).join("")}</td>
+          <td><span class="ltr num">$${x.price}</span></td><td>${now[x.t]?`<span class="ltr num">$${now[x.t]}</span>`:'<span class="mut">—</span>'}</td>
+          <td class="${x.r>=0?"pos":"neg"}">${pct(x.r,1)}</td></tr>`).join("")}</tbody></table></div></details>
+    </div>`}).join("");
+}
+load().then(()=>{ const v=location.hash.slice(1); if(v==="pat"||v==="jr") showView(v); });
 </script>
 </body>
 </html>
