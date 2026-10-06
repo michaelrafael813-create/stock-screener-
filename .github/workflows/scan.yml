@@ -49,6 +49,7 @@ jobs:
       - name: Run scanner
         env:
           FULL: ${{ github.event.schedule == '15 6 * * 2-6' || inputs.full == true }}
+          MASSIVE_API_KEY: ${{ secrets.MASSIVE_API_KEY }}
         run: python screener.py
 
       - name: Save data
