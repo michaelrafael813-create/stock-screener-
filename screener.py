@@ -49,7 +49,46 @@ CONFIG = {
     "w_quality": 0.40, "w_value": 0.35, "w_dip": 0.25,
     "red_flag_penalty": 10,
     "fundamentals_max_age_hours": 20,
+    # תעודות סל וקריפטו (רק ללשונית התבניות)
+    "etf_min_dollar_volume": 5_000_000,   # מחזור יומי ממוצע מינימלי
+    "exclude_leveraged_etfs": True,       # בלי ממונפות והפוכות
 }
+
+NASDAQ_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Origin": "https://www.nasdaq.com",
+    "Referer": "https://www.nasdaq.com/",
+}
+
+COINS = {
+    "BTC-USD": "Bitcoin", "ETH-USD": "Ethereum", "SOL-USD": "Solana", "XRP-USD": "XRP", "BNB-USD": "BNB",
+    "ADA-USD": "Cardano", "DOGE-USD": "Dogecoin", "AVAX-USD": "Avalanche", "LINK-USD": "Chainlink",
+    "DOT-USD": "Polkadot", "LTC-USD": "Litecoin", "BCH-USD": "Bitcoin Cash", "XLM-USD": "Stellar",
+    "TRX-USD": "TRON", "ATOM-USD": "Cosmos", "NEAR-USD": "NEAR Protocol", "UNI-USD": "Uniswap",
+    "AAVE-USD": "Aave", "HBAR-USD": "Hedera", "ETC-USD": "Ethereum Classic", "ICP-USD": "Internet Computer",
+    "FIL-USD": "Filecoin", "ALGO-USD": "Algorand",
+}
+
+# גיבוי למקרה ש-Nasdaq לא עונה: תעודות סל מרכזיות
+ETF_FALLBACK = """SPY QQQ IWM DIA VTI VOO IVV RSP MDY IJH IJR VB VO VUG VTV IWF IWD SCHD SCHG SCHX VIG VYM DGRO NOBL
+XLK XLF XLE XLV XLI XLY XLP XLU XLB XLRE XLC SMH SOXX IGV SKYY CIBR HACK BOTZ ARKK ARKG ARKW TAN ICLN LIT URA
+XBI IBB IHI KRE KBE XHB ITB XRT IYT JETS XOP OIH XME GDX GDXJ SIL COPX PAVE MOO IGF
+EFA EEM VEA VWO IEFA IEMG EWJ EWZ EWG EWU EWC EWY EWT EWA INDA FXI KWEB MCHI EWW EZU VGK ACWI
+GLD IAU SLV PPLT USO UNG DBC DBA PDBC CPER
+TLT IEF SHY AGG BND LQD HYG JNK TIP EMB MUB BIL SGOV
+IBIT FBTC ARKB BITB GBTC BITO ETHA FETH ETHE""".split()
+
+
+def is_leveraged(name):
+    import re
+    return bool(re.search(r"(\b[23]x\b|-[123]x\b|ultrashort|ultra(?!\s*-?\s*short)|inverse|\bshort\b(?!\s*-?\s*(term|duration|maturity|dated|income|bond|treasury))|\bbear\b|leveraged|daily .*(bull|bear))", name, re.I))
+
+
+def is_crypto_name(name):
+    import re
+    return bool(re.search(r"(bitcoin|\bether\b|ethereum|solana|\bxrp\b|crypto|litecoin|dogecoin|avalanche|chainlink|cardano|digital asset)", name, re.I))
 
 # ה-SEC דורש שם ומייל אמיתיים של מי שמפעיל את הסורק
 CONTACT_NAME = "Michael Rafael"
@@ -91,13 +130,7 @@ def log(*a):
 # ===================================================================
 def fetch_universe():
     url = "https://api.nasdaq.com/api/screener/stocks?tableonly=true&limit=10000&download=true"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
-        "Accept": "application/json, text/plain, */*",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Origin": "https://www.nasdaq.com",
-        "Referer": "https://www.nasdaq.com/",
-    }
+    headers = NASDAQ_HEADERS
     cache = DATA / "universe.json"
     try:
         r = requests.get(url, headers=headers, timeout=60)
@@ -143,6 +176,42 @@ def fetch_universe():
     cache.write_text(json.dumps(uni))
     log(f"ביקום: {len(uni)} חברות מעל {CONFIG['min_market_cap']/1e9:.0f} מיליארד $")
     return uni
+
+
+def fetch_etf_universe():
+    """רשימת תעודות סל מ-Nasdaq. מחזיר [{t, name, crypto}]."""
+    cache = DATA / "etfs.json"
+    rows = []
+    try:
+        r = requests.get("https://api.nasdaq.com/api/screener/etf?tableonly=true&limit=10000&download=true",
+                         headers=NASDAQ_HEADERS, timeout=60)
+        js = r.json().get("data") or {}
+        rows = (js.get("data") or {}).get("rows") or js.get("rows") or []
+    except Exception as e:
+        log("שגיאה בטעינת רשימת תעודות הסל:", e)
+    out = []
+    for row in rows:
+        sym = (row.get("symbol") or "").strip().upper()
+        name = (row.get("companyName") or row.get("name") or sym).strip()
+        if not sym or "^" in sym or "/" in sym or "." in sym:
+            continue
+        out.append({"t": sym, "name": name})
+    if len(out) > 200:
+        cache.write_text(json.dumps(out))
+        log(f"Nasdaq: {len(out)} תעודות סל")
+    elif cache.exists():
+        out = json.loads(cache.read_text())
+        log(f"משתמש ברשימת תעודות סל שמורה ({len(out)})")
+    else:
+        out = [{"t": t, "name": t} for t in ETF_FALLBACK]
+        log(f"משתמש ברשימת הגיבוי ({len(out)} תעודות)")
+    res = []
+    for e in out:
+        if CONFIG["exclude_leveraged_etfs"] and is_leveraged(e["name"]):
+            continue
+        e["crypto"] = is_crypto_name(e["name"]) or e["t"] in ("IBIT", "FBTC", "ARKB", "BITB", "GBTC", "BITO", "ETHA", "FETH", "ETHE")
+        res.append(e)
+    return res
 
 
 # ===================================================================
@@ -359,7 +428,7 @@ def refresh_fundamentals(universe):
 # ===================================================================
 #  3. מחירים
 # ===================================================================
-def fetch_prices(tickers):
+def fetch_prices(tickers, period="5y"):
     """מחזיר (מחירי סגירה, מחזורי מסחר) לכל מניה."""
     import yfinance as yf
     out, vols = {}, {}
@@ -368,7 +437,7 @@ def fetch_prices(tickers):
         df = None
         for attempt in range(3):
             try:
-                df = yf.download(chunk, period="5y", interval="1d", auto_adjust=False, progress=False,
+                df = yf.download(chunk, period=period, interval="1d", auto_adjust=False, progress=False,
                                  threads=True, group_by="ticker")
                 break
             except Exception as e:
@@ -1017,7 +1086,7 @@ def update_journal(j, results, patterns, closes, spy):
             "stocks": [{"t": r["t"], "tier": r["tier"], "price": r["price"], "score": r["score"],
                         "bottom": [b["k"] for b in r.get("bottom", [])]}
                        for r in results if r["tier"] in ("green", "yellow")],
-            "pats": [{"t": p["t"], "p": [x["k"] for x in p["pats"]], "st": [x["st"] for x in p["pats"]], "price": p["price"]}
+            "pats": [{"t": p["t"], "type": p.get("type", "stock"), "p": [x["k"] for x in p["pats"]], "st": [x["st"] for x in p["pats"]], "price": p["price"]}
                      for p in patterns],
         })
         log(f"נשמר צילום חודשי ליומן: {month}")
@@ -1055,10 +1124,25 @@ def main():
     journal = load_journal()
     tickers = [u["t"] for u in uni if u["t"] in fund]
     uni_t = {u["t"] for u in uni}
-    extra = sorted({x["t"] for sn in journal["snaps"] for x in sn["stocks"] + sn["pats"]} - set(tickers))
+    etfs = fetch_etf_universe()
+    if MAX_TICKERS:
+        etfs = etfs[:MAX_TICKERS]
+    etf_info = {e["t"]: e for e in etfs}
+    side = set(etf_info) | set(COINS)
+    extra = sorted({x["t"] for sn in journal["snaps"] for x in sn["stocks"] + sn["pats"]} - set(tickers) - side)
     all_t = tickers + [t for t in uni_t if t not in fund] + extra + ["SPY"]
     log(f"מוריד מחירים עבור {len(all_t)} מניות...")
     closes, vols = fetch_prices(list(dict.fromkeys(all_t)))
+    log(f"מוריד מחירים עבור {len(etfs)} תעודות סל ו-{len(COINS)} מטבעות...")
+    c2, v2 = fetch_prices([t for t in list(etf_info) + list(COINS) if t not in closes], period="2y")
+    for t in COINS:  # קריפטו נסחר 7 ימים בשבוע — משאירים ימי חול כדי שהתבניות יימדדו כמו במניות
+        if t in c2:
+            wk = c2[t].index.dayofweek < 5
+            c2[t] = c2[t][wk]
+            if t in v2:
+                v2[t] = v2[t][wk]
+    closes.update(c2)
+    vols.update(v2)
     spy = float(closes["SPY"].iloc[-1]) if "SPY" in closes else None
 
     state_path = DATA / "state.json"
@@ -1103,12 +1187,37 @@ def main():
         if not pats:
             continue
         r = by_t.get(t, {})
-        patterns.append({"t": t, "name": u["name"], "sector": u["sector"], "price": round(float(closes[t].iloc[-1]), 2),
+        patterns.append({"t": t, "type": "stock", "name": u["name"], "sector": u["sector"], "price": round(float(closes[t].iloc[-1]), 2),
                          "cap": round(u["cap"] / 1e9, 2), "tier": r.get("tier"), "score": r.get("score"),
                          "vr": vol_ratio(vols[t].values.astype(float)) if t in vols else None,
                          "pats": pats, "chart": chart_points(closes[t])})
         d150, up150, line150 = ma150_info(closes[t])
         patterns[-1].update({"ma150": d150, "ma150_up": up150, "ma150_line": line150})
+    # תעודות סל ומטבעות
+    n_etf = 0
+    for t in list(etf_info) + list(COINS):
+        if t not in closes or t in uni_t:
+            continue
+        c = closes[t]
+        if t in etf_info:
+            if len(c) < 60 or t not in vols:
+                continue
+            dv = float((c.iloc[-50:] * vols[t].iloc[-50:]).mean())
+            if dv < CONFIG["etf_min_dollar_volume"]:
+                continue
+            n_etf += 1
+        pats = tech_patterns(c, vols.get(t))
+        if not pats:
+            continue
+        is_coin = t in COINS
+        typ = "coin" if is_coin else ("crypto_etf" if etf_info[t]["crypto"] else "etf")
+        d150, up150, line150 = ma150_info(c)
+        patterns.append({"t": t, "type": typ, "name": COINS[t] if is_coin else etf_info[t]["name"],
+                         "sector": "קריפטו" if typ != "etf" else "תעודת סל", "price": round(float(c.iloc[-1]), 4 if c.iloc[-1] < 1 else 2),
+                         "cap": None, "tier": None, "score": None,
+                         "vr": vol_ratio(vols[t].values.astype(float)) if t in vols else None,
+                         "pats": pats, "chart": chart_points(c), "ma150": d150, "ma150_up": up150, "ma150_line": line150})
+    log(f"תעודות סל נזילות שנסרקו: {n_etf}")
     patterns.sort(key=lambda p: (0 if any(x["st"] == "breakout" for x in p["pats"]) else 1, -(p["vr"] or 0)))
     log(f"תבניות: {len(patterns)} מניות")
 
