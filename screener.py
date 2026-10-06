@@ -117,7 +117,7 @@ def sec_json(url, tries=4):
         time.sleep(3 + attempt * 5)
     raise RuntimeError(f"ה-SEC לא ענה עבור {url} — {last}")
 
-VERSION = "1.6"
+VERSION = "1.8"
 FULL = os.environ.get("FULL", "").lower() == "true"
 MAX_TICKERS = int(os.environ.get("MAX_TICKERS", "0") or 0)
 
@@ -491,6 +491,9 @@ def refresh_fundamentals(universe):
 # ===================================================================
 #  3. מחירים
 # ===================================================================
+HL = {}  # מחיר גבוה/נמוך יומי — למיקום הסגירה בטווח היום
+
+
 def fetch_prices(tickers, period="5y"):
     """מחזיר (מחירי סגירה, מחזורי מסחר) לכל מניה."""
     import yfinance as yf
@@ -521,6 +524,12 @@ def fetch_prices(tickers, period="5y"):
                         if getattr(v.index, "tz", None) is not None:
                             v.index = v.index.tz_localize(None)
                         vols[t] = v.fillna(0)
+                    except Exception:
+                        pass
+                    try:
+                        sub = df[t] if isinstance(df.columns, pd.MultiIndex) else df
+                        hh, ll = sub["High"].reindex(s.index), sub["Low"].reindex(s.index)
+                        HL[t] = (hh.values[-30:].astype(float), ll.values[-30:].astype(float))
                     except Exception:
                         pass
             except Exception:
@@ -638,6 +647,67 @@ def fetch_fx(ccys):
         if c not in fx:
             log(f"  אין שער עבור {c} — חברות במטבע הזה יידלגו")
     return fx
+
+
+# ===================================================================
+#  3ג. מספר עסקאות יומי (Massive / Polygon לשעבר) — מניות ותעודות בארה"ב
+# ===================================================================
+MASSIVE_KEY = os.environ.get("MASSIVE_API_KEY", "").strip()
+
+
+def fetch_transactions(dates, wanted):
+    """שומר ווליום ומספר עסקאות לכל יום מסחר. קריאה אחת ליום מחזירה את כל השוק.
+    בתוכנית החינמית: 5 קריאות לדקה, ולכן ממתינים ~13 שניות בין קריאות."""
+    path = DATA / "trades.json"
+    cache = json.loads(path.read_text()) if path.exists() else {}
+    if not MASSIVE_KEY:
+        log("אין מפתח MASSIVE_API_KEY — מדלג על נתוני עסקאות")
+        return cache
+    todo = [x for x in dates[-60:] if x not in cache][-70:]
+    if todo:
+        log(f"מוריד נתוני עסקאות עבור {len(todo)} ימי מסחר (כ-{len(todo) * 13 // 60 + 1} דקות)...")
+    for i, day in enumerate(todo):
+        url = f"https://api.massive.com/v2/aggs/grouped/locale/us/market/stocks/{day}?adjusted=true&apiKey={MASSIVE_KEY}"
+        for attempt in range(3):
+            try:
+                r = requests.get(url, timeout=60)
+                if r.status_code == 429:
+                    time.sleep(65)
+                    continue
+                if r.status_code in (401, 403):
+                    log("  מפתח Massive לא תקין או חסרה הרשאה — מדלג")
+                    return cache
+                js = r.json()
+                res = js.get("results") or []
+                if res:
+                    cache[day] = {x["T"]: [x.get("v"), x.get("n")] for x in res if x.get("T") in wanted}
+                break
+            except Exception as e:
+                log("  שגיאת עסקאות:", e)
+                time.sleep(15)
+        if i < len(todo) - 1:
+            time.sleep(13)
+    keep = sorted(cache)[-70:]
+    cache = {k: cache[k] for k in keep}
+    path.write_text(json.dumps(cache, separators=(",", ":")))
+    return cache
+
+
+def tx_stats(t, close, trades):
+    """מספר עסקאות ממוצע, גודל עסקה ממוצע, והשינוי בו."""
+    days = sorted(trades)
+    rows = [(d, trades[d].get(t)) for d in days]
+    rows = [(d, x[0], x[1]) for d, x in rows if x and x[0] and x[1]]
+    if len(rows) < 25:
+        return None
+    n = np.array([x[2] for x in rows], float)
+    v = np.array([x[1] for x in rows], float)
+    ats = v / n
+    a10, a_prev = float(np.mean(ats[-10:])), float(np.mean(ats[-30:-10]))
+    n10, n_prev = float(np.mean(n[-10:])), float(np.mean(n[-30:-10]))
+    return {"n20": int(np.mean(n[-20:])), "ats": round(a10, 1),
+            "ats_chg": round(a10 / a_prev - 1, 3) if a_prev else None,
+            "n_chg": round(n10 / n_prev - 1, 3) if n_prev else None}
 
 
 # ===================================================================
@@ -1326,7 +1396,7 @@ def ret_n(s, n):
     return float(s.iloc[-1] / s.iloc[-n - 1] - 1) if s is not None and len(s) > n else None
 
 
-def timing(close, vol, spy, sec, iv):
+def timing(close, vol, spy, sec, iv, hl=None, tx=None):
     c = close
     price = float(c.iloc[-1])
     s50, s200 = c.rolling(50).mean(), c.rolling(200).mean()
@@ -1361,9 +1431,10 @@ def timing(close, vol, spy, sec, iv):
         ch = c.diff().values[-60:]
         vv = vol.values[-60:].astype(float)
         dn, up = vv[ch < 0], vv[ch > 0]
-        if len(dn) > 5 and len(up) > 5 and up.mean() > 0:
-            ratio = dn.mean() / up.mean()
-            T.append(check("מחזור נמוך בימי ירידה (מכירה נחלשת)", 1 if ratio <= 1.0 else (0.5 if ratio <= 1.3 else 0), f"{ratio:.2f}×", 1.5))
+        vs = volume_score(c, vol, hl, tx)
+        if vs is not None:
+            T.append(check("ציון ווליום (לחץ המכירה נחלש?)", 1 if vs["score"] >= 4 else (0.5 if vs["score"] >= -3 else 0),
+                           f"{vs['score']:+d} — {vs['cls']}", 2))
         avg = float(np.mean(vol.values[-80:-20])) or 1
         support = float(c.iloc[-80:-20].min())
         for i in range(len(c) - 20, len(c)):
@@ -1441,6 +1512,150 @@ def timing(close, vol, spy, sec, iv):
 
 
 # ===================================================================
+#  4ה. ציון ווליום (-10 עד +10) — האם לחץ המכירה נחלש או נמשך
+# ===================================================================
+def volume_score(close, vol, hl=None, tx=None):
+    if vol is None or len(vol) != len(close) or len(close) < 90:
+        return None
+    c = close.values.astype(float)
+    v = vol.values.astype(float)
+    if np.mean(v[-50:]) <= 0:
+        return None
+    r = np.diff(c) / c[:-1]
+    r = np.concatenate([[0], r])
+    avg20 = float(np.mean(v[-21:-1])) or 1
+    avg50 = float(np.mean(v[-51:-1])) or 1
+    rv20, rv50 = v[-1] / avg20, v[-1] / avg50
+    score, notes = 0, []
+
+    def add(x, txt):
+        nonlocal score
+        score += x
+        notes.append((x, txt))
+
+    # 1. ירידה בווליום יורד מול גל העלייה שלפניה
+    hi_i = len(c) - 40 + int(np.argmax(c[-40:]))
+    drop = 1 - c[-1] / c[hi_i]
+    if drop >= 0.05 and hi_i >= 25 and len(c) - hi_i >= 3:
+        pull = np.mean(v[hi_i + 1:])
+        upleg = np.mean(v[hi_i - 20:hi_i + 1])
+        ratio = pull / upleg if upleg > 0 else 1
+        if ratio <= 0.8:
+            add(4, f"התיקון מתרחש בווליום נמוך ({ratio:.2f}× מגל העלייה) — מוכרים פחות לחוצים")
+        elif ratio <= 1.0:
+            add(2, f"ווליום התיקון לא גבוה מגל העלייה ({ratio:.2f}×)")
+        elif ratio >= 1.3:
+            add(-4, f"הירידה מגיעה בווליום גבוה ({ratio:.2f}× מגל העלייה) — מכירה בשכנוע")
+        elif ratio >= 1.1:
+            add(-2, f"ווליום הירידה מעט גבוה מגל העלייה ({ratio:.2f}×)")
+
+    # 2. קפיטולציה ואחריה התייבשות
+    capit_ok = False
+    spike = None
+    for i in range(len(c) - 30, len(c) - 3):
+        base = np.mean(v[max(0, i - 50):i]) or 1
+        if r[i] <= -0.04 and v[i] / base >= 3:
+            spike = i
+    if spike is not None:
+        # אשכול הפאניקה = יום השיא ועד יומיים אחריו; בודקים מה קורה אחר כך
+        cap_end = min(spike + 3, len(c) - 1)
+        cap_low = float(np.min(c[spike:cap_end]))
+        base = float(np.mean(v[max(0, spike - 50):spike])) or avg50
+        after = range(cap_end, len(c))
+        red_after = [v[i] for i in after if r[i] < 0]
+        heavy_red = sum(1 for i in after if r[i] < 0 and v[i] / base >= 2)
+        held = np.min(c[cap_end:]) >= cap_low * 0.97
+        if heavy_red >= 2:
+            add(-5, "אחרי יום הפאניקה ממשיכים ימים אדומים בווליום כבד — המכירה לא נגמרה")
+        elif red_after and np.mean(red_after) <= base * 0.9 and held:
+            capit_ok = True
+            add(3, "קפיטולציה: יום ירידה עם ווליום פי 3+, ואחריו ווליום המכירה התייבש והמחיר לא שבר את השפל")
+
+    # 3. צבירה: ווליום בימים ירוקים מול אדומים (20 יום)
+    up, dn = v[-20:][r[-20:] > 0], v[-20:][r[-20:] < 0]
+    if len(up) >= 4 and len(dn) >= 4:
+        ud = np.mean(up) / np.mean(dn)
+        if ud >= 1.3:
+            add(4, f"צבירה: בימים ירוקים הווליום גבוה פי {ud:.2f} מבימים אדומים")
+        elif ud >= 1.1:
+            add(2, f"ימים ירוקים בווליום מעט גבוה מאדומים ({ud:.2f}×)")
+        elif ud <= 0.7:
+            add(-4, f"הפצה: בימים אדומים הווליום גבוה בהרבה ({1 / ud:.2f}× מירוקים)")
+        elif ud <= 0.9:
+            add(-2, f"ימים אדומים בווליום גבוה מירוקים ({1 / ud:.2f}×)")
+
+    # 4. תמיכה: מחזיקה או נשברת בווליום
+    support = float(np.min(c[-80:-20]))
+    broke = [i for i in range(len(c) - 20, len(c)) if c[i] < support * 0.99 and v[i] / avg50 >= 2]
+    support_ok = False
+    if broke:
+        add(-5, f"שבירת תמיכה (${support:,.2f}) בווליום כבד")
+    elif np.min(c[-10:]) >= support * 0.99 and np.min(c[-20:]) <= support * 1.08:
+        dn10 = v[-10:][r[-10:] < 0]
+        if len(dn10) and np.mean(dn10) <= avg50:
+            support_ok = True
+            add(2, "המחיר מחזיק מעל תמיכה, וימי הירידה בווליום נמוך")
+
+    # 5. פריצה מאושרת בווליום
+    green_spike = False
+    res = float(np.max(c[-60:-10]))
+    for i in range(len(c) - 10, len(c)):
+        if c[i] > res and v[i] / avg50 >= 1.5:
+            add(3, "פריצת התנגדות בווליום גבוה (פי 1.5+)")
+            break
+    for i in range(len(c) - 10, len(c)):
+        if r[i] > 0 and v[i] / avg50 >= 1.5:
+            green_spike = True
+
+    # 6. מכירה מתמשכת
+    base_long = float(np.median(v[-150:-50])) or avg50
+    if c[-1] < c[-11] * 0.97 and np.mean(v[-10:]) / min(avg50, base_long) >= 1.5 and np.sum(r[-10:] < 0) >= 6:
+        add(-4, "המחיר ממשיך לרדת והווליום נשאר גבוה — לחץ מכירה מתמשך")
+
+    # 7. מיקום הסגירה בטווח היומי
+    if hl is not None:
+        hh, ll = hl
+        n = min(10, len(hh))
+        good = 0
+        for k in range(1, n + 1):
+            h_, l_, cc = hh[-k], ll[-k], c[-k]
+            if h_ > l_ and r[-k] > 0 and (cc - l_) / (h_ - l_) >= 0.5 and v[-k] >= avg20:
+                good += 1
+        if good >= 2:
+            add(1, f"{good} ימים ירוקים עם סגירה בחצי העליון של הטווח בווליום מעל הממוצע")
+
+    # 8. גודל עסקה ממוצע (רמז תומך בלבד)
+    if tx and tx.get("ats_chg") is not None:
+        ac, nc = tx["ats_chg"], tx.get("n_chg") or 0
+        stabilizing = c[-1] >= np.min(c[-10:]) * 1.01 and np.min(c[-10:]) >= np.min(c[-30:]) * 0.99
+        falling = c[-1] < c[-11] * 0.97
+        if stabilizing and ac >= 0.4:
+            add(3, f"גודל העסקה הממוצע עלה ב-{ac * 100:.0f}% בזמן ההתייצבות — אולי גופים גדולים נכנסים")
+        elif stabilizing and ac >= 0.2:
+            add(2, f"גודל העסקה הממוצע עלה ב-{ac * 100:.0f}% בזמן ההתייצבות")
+        elif falling and nc >= 0.3 and ac <= -0.15:
+            add(-2, "בזמן הירידה: יותר עסקאות וקטנות יותר — מכירה מפוזרת")
+
+    score = int(max(-10, min(10, score)))
+    # רצף ההיפוך השורי המלא
+    if capit_ok and support_ok and green_spike:
+        score = max(score, 7)
+        notes.append((0, "רצף היפוך שורי: פאניקה ← התייבשות ← תמיכה מחזיקה ← קונים חוזרים בווליום"))
+    if score >= 7:
+        cls = "אישור חזק"
+    elif score >= 4:
+        cls = "אישור בינוני"
+    elif score >= -3:
+        cls = "מעורב / ניטרלי"
+    elif score >= -6:
+        cls = "חלש — סימני הפצה"
+    else:
+        cls = "סתירה חזקה"
+    return {"score": score, "cls": cls, "rv20": round(rv20, 2), "rv50": round(rv50, 2), "av20": int(np.mean(v[-20:])), "tx": tx,
+            "notes": [t for x, t in sorted(notes, key=lambda z: -abs(z[0]))]}
+
+
+# ===================================================================
 #  4ג. יומן ביצועים חודשי
 # ===================================================================
 def load_journal():
@@ -1469,9 +1684,9 @@ def update_journal(j, results, patterns, closes, spy):
             "month": month, "date": today.isoformat(), "spy": round(spy, 2),
             "stocks": [{"t": r["t"], "tier": r["tier"], "price": r["price"], "score": r["score"],
                         "bottom": [b["k"] for b in r.get("bottom", [])],
-                        "light": (r.get("timing") or {}).get("light")}
+                        "light": (r.get("timing") or {}).get("light"), "vol": (r.get("vol") or {}).get("score")}
                        for r in results if r["tier"] in ("green", "yellow")],
-            "pats": [{"t": p["t"], "type": p.get("type", "stock"), "p": [x["k"] for x in p["pats"]], "st": [x["st"] for x in p["pats"]], "price": p["price"]}
+            "pats": [{"t": p["t"], "type": p.get("type", "stock"), "vol": (p.get("vol") or {}).get("score"), "p": [x["k"] for x in p["pats"]], "st": [x["st"] for x in p["pats"]], "price": p["price"]}
                      for p in patterns],
         })
         log(f"נשמר צילום חודשי ליומן: {month}")
@@ -1536,6 +1751,9 @@ def main():
         closes.update(c3)
         vols.update(v3)
     spy = float(closes["SPY"].iloc[-1]) if "SPY" in closes else None
+    trade_days = [x.strftime("%Y-%m-%d") for x in closes["SPY"].index[-61:-1]] if "SPY" in closes else []
+    trades = fetch_transactions(trade_days, set(tickers) | uni_t | set(etf_info)) if trade_days else {}
+    TX = lambda t: tx_stats(t, closes.get(t), trades) if trades else None
 
     ccys = {f.get("ccy", "USD") for f in fund.values()} - {"USD"}
     fx = fetch_fx(sorted(ccys)) if ccys else {"USD": 1.0}
@@ -1567,8 +1785,10 @@ def main():
         except Exception:
             r["bottom"] = []
         try:
-            tm = timing(closes[t], vols.get(t), closes.get("SPY"), closes.get(SECTOR_ETF.get(u["sector"], "")), r.get("iv"))
+            txs = TX(t)
+            tm = timing(closes[t], vols.get(t), closes.get("SPY"), closes.get(SECTOR_ETF.get(u["sector"], "")), r.get("iv"), HL.get(t), txs)
             r["timing"] = tm
+            r["vol"] = volume_score(closes[t], vols.get(t), HL.get(t), txs)
             r["yellow"].extend(tm["flags"])
             if tm["light"] == "red" and r["tier"] == "green":
                 r["tier"] = "yellow"
@@ -1601,7 +1821,7 @@ def main():
         patterns.append({"t": t, "type": "stock", "name": u["name"], "sector": u["sector"], "price": round(float(closes[t].iloc[-1]), 2),
                          "cap": round(u["cap"] / 1e9, 2), "tier": r.get("tier"), "score": r.get("score"),
                          "vr": vol_ratio(vols[t].values.astype(float)) if t in vols else None,
-                         "pats": pats, "chart": chart_points(closes[t])})
+                         "pats": pats, "chart": chart_points(closes[t]), "vol": volume_score(closes[t], vols.get(t), HL.get(t), TX(t))})
         d150, up150, line150 = ma150_info(closes[t])
         patterns[-1].update({"ma150": d150, "ma150_up": up150, "ma150_line": line150, "rsi": rsi_status(closes[t])})
     # תעודות סל ומטבעות
@@ -1628,7 +1848,7 @@ def main():
                          "cap": None, "tier": None, "score": None,
                          "vr": vol_ratio(vols[t].values.astype(float)) if t in vols else None,
                          "pats": pats, "chart": chart_points(c), "ma150": d150, "ma150_up": up150, "ma150_line": line150,
-                         "rsi": rsi_status(c)})
+                         "rsi": rsi_status(c), "vol": volume_score(c, vols.get(t), HL.get(t), TX(t) if t in etf_info else None)})
     log(f"תעודות סל נזילות שנסרקו: {n_etf}")
     for t, ex in intl.items():
         if t not in closes:
@@ -1642,7 +1862,7 @@ def main():
                          "sector": "", "price": round(float(c.iloc[-1]), 2), "cap": None, "tier": None, "score": None,
                          "vr": vol_ratio(vols[t].values.astype(float)) if t in vols else None,
                          "pats": pats, "chart": chart_points(c), "ma150": d150, "ma150_up": up150, "ma150_line": line150,
-                         "rsi": rsi_status(c)})
+                         "rsi": rsi_status(c), "vol": volume_score(c, vols.get(t), HL.get(t))})
     patterns.sort(key=lambda p: (0 if any(x["st"] == "breakout" for x in p["pats"]) else 1, -(p["vr"] or 0)))
     log(f"תבניות: {len(patterns)} מניות")
 
