@@ -117,6 +117,7 @@ def sec_json(url, tries=4):
         time.sleep(3 + attempt * 5)
     raise RuntimeError(f"ה-SEC לא ענה עבור {url} — {last}")
 
+VERSION = "1.6"
 FULL = os.environ.get("FULL", "").lower() == "true"
 MAX_TICKERS = int(os.environ.get("MAX_TICKERS", "0") or 0)
 
@@ -245,21 +246,55 @@ INSTANT = {
 }
 UNIT = {"eps": "USD/shares", "shares": "shares"}
 
+# חברות זרות שמדווחות ל-SEC בתקן הבינלאומי (IFRS) — טפסי 20-F / 40-F
+FLOW_IFRS = {
+    "rev": ["Revenue", "RevenueFromContractsWithCustomers"],
+    "ni": ["ProfitLossAttributableToOwnersOfParent", "ProfitLoss"],
+    "eps": ["DilutedEarningsLossPerShare", "BasicEarningsLossPerShare", "BasicAndDilutedEarningsLossPerShare"],
+    "opinc": ["ProfitLossFromOperatingActivities"],
+    "gp": ["GrossProfit"],
+    "cogs": ["CostOfSales"],
+    "ocf": ["CashFlowsFromUsedInOperatingActivities"],
+    "capex": ["PurchaseOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities", "PurchaseOfPropertyPlantAndEquipment"],
+    "da": ["DepreciationAndAmortisationExpense", "AdjustmentsForDepreciationAndAmortisationExpense",
+           "DepreciationAmortisationAndImpairmentLossReversalOfImpairmentLossRecognisedInProfitOrLoss"],
+    "int": ["InterestExpense", "FinanceCosts"],
+    "tax": ["IncomeTaxExpenseContinuingOperations"],
+    "pretax": ["ProfitLossBeforeTax"],
+    "shares": ["AdjustedWeightedAverageShares", "WeightedAverageShares"],
+}
+INSTANT_IFRS = {
+    "debt_total": ["Borrowings"],
+    "debt_nc": ["LongtermBorrowings", "NoncurrentPortionOfNoncurrentBorrowings"],
+    "debt_cur": ["CurrentPortionOfLongtermBorrowings", "CurrentBorrowingsAndCurrentPortionOfNoncurrentBorrowings"],
+    "st_borrow": ["ShorttermBorrowings"],
+    "cash": ["CashAndCashEquivalents"],
+    "sti": ["ShorttermDepositsNotClassifiedAsCashEquivalents"],
+    "equity": ["EquityAttributableToOwnersOfParent", "Equity"],
+}
+ANNUAL_FORMS = ("10-K", "20-F", "40-F")
+EXTRACT_VERSION = 2
+MONEY_KEYS = ("rev", "ni", "eps", "opinc", "gp", "cogs", "ocf", "capex", "da", "int", "tax", "pretax", "debt", "cash", "equity")
+
+
+def is_annual(form):
+    return form.startswith(ANNUAL_FORMS)
+
 
 def d(s):
     return dt.date.fromisoformat(s)
 
 
-def collect(facts, tags, unit):
+def collect(facts, tags, unit, tax="us-gaap"):
     out = []
-    g = facts.get("facts", {}).get("us-gaap", {})
+    g = facts.get("facts", {}).get(tax, {})
     for prio, tag in enumerate(tags):
         node = g.get(tag)
         if not node:
             continue
         for f in node.get("units", {}).get(unit, []):
             form = f.get("form", "")
-            if not (form.startswith("10-K") or form.startswith("10-Q")):
+            if not (is_annual(form) or form.startswith("10-Q")):
                 continue
             out.append((prio, f.get("start"), f["end"], f["val"], f.get("filed", ""), form))
     return out
@@ -268,7 +303,7 @@ def collect(facts, tags, unit):
 def annual_flow(entries):
     best = {}
     for prio, s, e, v, filed, form in entries:
-        if not s or not form.startswith("10-K"):
+        if not s or not is_annual(form):
             continue
         if not 330 <= (d(e) - d(s)).days <= 400:
             continue
@@ -290,7 +325,7 @@ def ttm_flow(entries, ann):
     tags = sorted({x[0] for x in entries})
     for p in tags:
         ent = [x for x in entries if x[0] == p and x[1]]
-        a = {e: v for (pp, s, e, v, f, fm) in ent if fm.startswith("10-K") and 330 <= (d(e) - d(s)).days <= 400}
+        a = {e: v for (pp, s, e, v, f, fm) in ent if is_annual(fm) and 330 <= (d(e) - d(s)).days <= 400}
         if last_fy not in a:
             continue
         ytd = [x for x in ent if x[5].startswith("10-Q") and abs((d(x[1]) - lf).days - 1) <= 12 and (d(x[2]) - lf).days > 60]
@@ -312,7 +347,7 @@ def instants(entries, annual_only):
     for prio, s, e, v, filed, form in entries:
         if s:
             continue
-        if annual_only and not form.startswith("10-K"):
+        if annual_only and not is_annual(form):
             continue
         key = (prio, -int(filed.replace("-", "") or 0))
         cur = best.get(e)
@@ -340,11 +375,29 @@ def latest(series):
     return series[e], e
 
 
+def detect_reporting(facts):
+    """איזה תקן (US-GAAP / IFRS) ובאיזה מטבע החברה מדווחת."""
+    best = None
+    for tax, tags in (("us-gaap", FLOW["rev"]), ("ifrs-full", FLOW_IFRS["rev"])):
+        g = facts.get("facts", {}).get(tax, {})
+        for tag in tags:
+            for unit, arr in g.get(tag, {}).get("units", {}).items():
+                if "/" in unit or len(unit) != 3:
+                    continue
+                n = sum(1 for f in arr if is_annual(f.get("form", "")) and f.get("start"))
+                if n and (best is None or n > best[2]):
+                    best = (tax, unit, n)
+    return (best[0], best[1]) if best else ("us-gaap", "USD")
+
+
 def extract(facts):
     """מחזיר סדרות שנתיות + TTM + מאזן אחרון, בפורמט קומפקטי לשמירה."""
+    tax, ccy = detect_reporting(facts)
+    FL, IN = (FLOW, INSTANT) if tax == "us-gaap" else (FLOW_IFRS, INSTANT_IFRS)
+    units = {"eps": f"{ccy}/shares", "shares": "shares"}
     flows, ttm, yoy, ttm_end = {}, {}, {}, None
-    for k, tags in FLOW.items():
-        ent = collect(facts, tags, UNIT.get(k, "USD"))
+    for k, tags in FL.items():
+        ent = collect(facts, tags, units.get(k, ccy), tax)
         ann = annual_flow(ent)
         flows[k] = ann
         if k in ("rev", "ni", "eps", "opinc", "ocf", "capex", "da", "int", "gp", "cogs"):
@@ -357,8 +410,8 @@ def extract(facts):
     fy = sorted(flows["rev"])[-7:]
 
     inst_a, inst_l = {}, {}
-    for k, tags in INSTANT.items():
-        ent = collect(facts, tags, "USD")
+    for k, tags in IN.items():
+        ent = collect(facts, tags, ccy, tax)
         inst_a[k] = instants(ent, True)
         inst_l[k] = instants(ent, False)
 
@@ -373,7 +426,7 @@ def extract(facts):
         return (near(src["cash"], date) or 0) + (near(src["sti"], date) or 0)
 
     series = {"fy": fy}
-    for k in FLOW:
+    for k in FL:
         series[k] = [near(flows[k], e, 10) for e in fy]
     series["debt"] = [debt_at(inst_a, e) for e in fy]
     series["cash"] = [cash_at(inst_a, e) for e in fy]
@@ -387,7 +440,7 @@ def extract(facts):
     d_eq = last_date(["equity"])
     bal = {"date": max(d_debt, d_cash, d_eq), "debt": debt_at(inst_l, d_debt), "cash": cash_at(inst_l, d_cash),
            "equity": near(inst_l["equity"], d_eq)}
-    return {"s": series, "ttm": ttm, "yoy": yoy, "ttm_end": ttm_end, "bal": bal}
+    return {"s": series, "ttm": ttm, "yoy": yoy, "ttm_end": ttm_end, "bal": bal, "tax": tax, "ccy": ccy}
 
 
 def refresh_fundamentals(universe):
@@ -396,10 +449,17 @@ def refresh_fundamentals(universe):
     age_h = 1e9
     if old.get("updated"):
         age_h = (dt.datetime.utcnow() - dt.datetime.fromisoformat(old["updated"])).total_seconds() / 3600
-    missing = [u for u in universe if u["t"] not in old["by_ticker"]]
+    def needs(t):
+        x = old["by_ticker"].get(t)
+        if x is None:
+            return True
+        if x.get("none"):  # לא נמצאו נתונים — מנסים שוב פעם בשבוע או כשהפענוח שודרג
+            return x.get("xv") != EXTRACT_VERSION or (dt.date.today() - dt.date.fromisoformat(x["date"])).days >= 7
+        return False
+    missing = [u for u in universe if needs(u["t"])]
     if not FULL and age_h < CONFIG["fundamentals_max_age_hours"] and not missing:
         log(f"דוחות עדכניים ({age_h:.1f} שעות) — מדלג על רענון")
-        return old["by_ticker"]
+        return {k: v for k, v in old["by_ticker"].items() if not v.get("none")}
     todo = universe if (FULL or age_h >= CONFIG["fundamentals_max_age_hours"]) else missing
     log(f"מוריד דוחות מה-SEC עבור {len(todo)} חברות...")
     out = dict(old["by_ticker"])
@@ -412,17 +472,20 @@ def refresh_fundamentals(universe):
             if i < 3:
                 log("  ", e)
         time.sleep(0.12)  # מגבלת ה-SEC: עד 10 בקשות בשנייה
+        x = None
         if facts:
             try:
                 x = extract(facts)
-                if x:
-                    out[u["t"]] = x
             except Exception as e:
                 log("  שגיאה בפענוח", u["t"], e)
+        if x:
+            out[u["t"]] = x
+        elif u["t"] not in out or out[u["t"]].get("none"):
+            out[u["t"]] = {"none": True, "date": dt.date.today().isoformat(), "xv": EXTRACT_VERSION}
         if (i + 1) % 100 == 0:
             log(f"  {i + 1}/{len(todo)}")
     path.write_text(json.dumps(clean({"updated": dt.datetime.utcnow().isoformat(), "by_ticker": out}), separators=(",", ":")))
-    return out
+    return {k: v for k, v in out.items() if not v.get("none")}
 
 
 # ===================================================================
@@ -465,6 +528,116 @@ def fetch_prices(tickers, period="5y"):
         time.sleep(1.5)
         log(f"  מחירים: {min(i + 80, len(tickers))}/{len(tickers)}")
     return out, vols
+
+
+# ===================================================================
+#  3ב. בורסות זרות (רק ללשונית התבניות) + שערי מטבע
+# ===================================================================
+INTL = {
+    "TA": {"n": "תל אביב", "sfx": ".TA", "ccy": "אג'", "url": "https://en.wikipedia.org/wiki/TA-125_Index", "col": r"symbol|ticker",
+           "fb": "TEVA LUMI POLI DSCT MZTF FIBI NICE ICL ESLT BEZQ AZRG TSEM NVMI CAMT PHOE HARL CLIS ORL DLEKG ENLT ALHE AMOT BIG MLSR SPEN OPCE STRS SAE FOX ELCO ELAL ENRG NWMD PZOL MGDL"},
+    "L": {"n": "לונדון", "sfx": ".L", "ccy": "פני", "url": "https://en.wikipedia.org/wiki/FTSE_100_Index", "col": r"ticker|epic|symbol",
+          "fb": "AZN SHEL HSBA ULVR BP RIO GSK REL DGE BATS LSEG GLEN AAL NG LLOY BARC VOD PRU TSCO CPG RKT EXPN BA IMB SSE NWG STAN III AHT HLN BT-A ABF AV LGEN SGE WPP IHG RR SMIN SPX MNDI BNZL INF ITRK HL LAND BLND SGRO PSON KGF SBRY NXT JD AUTO RTO SDR PSN BDEV TW MKS FRES ANTO ENT WTB SMT ADM HIK BKG CNA UU SVT DCC SN ICG IMI HLMA"},
+    "DE": {"n": "גרמניה", "sfx": ".DE", "ccy": "€", "url": "https://en.wikipedia.org/wiki/DAX", "col": r"ticker|symbol",
+           "fb": "SAP SIE ALV DTE AIR MBG MUV2 BAS BMW IFX DHL DB1 BAYN ADS VOW3 RWE DBK EOAN HEN3 MRK CBK SHL HEI DTG BEIR CON ENR FRE FME HNR1 MTX PAH3 P911 QIA RHM SRT3 SY1 VNA ZAL"},
+    "PA": {"n": "צרפת", "sfx": ".PA", "ccy": "€", "url": "https://en.wikipedia.org/wiki/CAC_40", "col": r"ticker|symbol",
+           "fb": "MC OR RMS TTE SAN AI SU AIR BNP SAF CS EL DG KER RI BN ACA GLE ENGI CAP ORA VIE LR PUB SGO STLAP ML HO STMPA ERF ALO DSY TEP URW EN VIV AC"},
+    "T": {"n": "יפן", "sfx": ".T", "ccy": "¥", "url": "https://en.wikipedia.org/wiki/Nikkei_225", "rx": r"(?:TYO|TSE)\s*:\s*(\d{4})",
+          "fb": "7203 6758 9984 6861 8306 9432 6098 8035 9983 4063 6501 7974 8058 8031 8001 4502 6367 6954 7267 6902 8316 8411 9433 4519 4568 6594 7741 6981 6273 4661 2914 3382 7011 6146 6857 8766 6503 4543 6702 6752 7751 5108 9020 9022 8801 8802 4901 6301 7201 6762 2802 4452 6723 7733"},
+    "TO": {"n": "קנדה", "sfx": ".TO", "ccy": "C$", "url": "https://en.wikipedia.org/wiki/S%26P/TSX_60", "col": r"symbol|ticker",
+           "fb": "RY TD ENB SHOP CNR CP BMO BNS CM BN TRI CNQ SU ATD MFC WCN CSU NTR FTS IMO TRP L SLF IFC GIB-A AEM ABX WPM FNV CCO TECK-B BCE T MRU DOL QSR NA POW CVE GWO X EMA H CAE CCL-B CTC-A FM K OTEX RCI-B SAP WN TOU BAM CU"},
+    "HK": {"n": "הונג קונג", "sfx": ".HK", "ccy": "HK$", "url": "https://en.wikipedia.org/wiki/Hang_Seng_Index", "rx": r"SEHK\s*:\s*(\d{1,5})",
+           "fb": "0700 9988 3690 0005 1299 0939 1398 3988 0941 0388 2318 1810 9618 1211 0883 0857 0386 2388 0011 0016 0001 1113 0002 0003 0006 0027 1928 2020 2319 0291 1109 0688 1093 2269 9999 9888 1024 2015 9868 9961 0981 0992 2628 2382 0669 0066 0823 0267 0960 1088 2899 0175 6618 0241 1876"},
+    "CN": {"n": "סין", "sfx": "", "ccy": "CN¥", "url": "https://en.wikipedia.org/wiki/CSI_300_Index", "rx": r"(SSE|SZSE)\s*:\s*(\d{6})",
+           "fb": "600519 300750 601318 600036 000858 601166 000333 600276 601012 002594 600900 601398 601288 601988 600030 000651 002415 300059 600887 601899 600309 000568 600809 002475 300760 601888 600028 601857 600050 601728 600941 000001 002714 300124 603259 688981"},
+}
+WIKI_UA = {"User-Agent": "Mozilla/5.0 (personal stock screener; contact via GitHub)"}
+
+
+def _wiki_tables(html):
+    import re, html as H
+    out = []
+    for tb in re.findall(r"<table[^>]*wikitable[^>]*>(.*?)</table>", html, re.S):
+        grid = []
+        for row in re.findall(r"<tr[^>]*>(.*?)</tr>", tb, re.S):
+            cells = re.findall(r"<t[hd][^>]*>(.*?)</t[hd]>", row, re.S)
+            grid.append([H.unescape(re.sub(r"<[^>]+>", "", c)).strip() for c in cells])
+        out.append(grid)
+    return out
+
+
+def _norm(ex, raw):
+    import re
+    x = raw.strip().upper()
+    if ex == "T":
+        return x + ".T" if re.fullmatch(r"\d{4}", x) else None
+    if ex == "HK":
+        return x.zfill(4) + ".HK" if re.fullmatch(r"\d{1,5}", x) else None
+    if ex == "CN":
+        if not re.fullmatch(r"\d{6}", x):
+            return None
+        return x + (".SS" if x[0] in "69" else ".SZ")
+    x = re.sub(r"\.(L|DE|PA|TO|TA)$", "", x).replace(".", "-")
+    x = x.split()[0] if x else x
+    return x + INTL[ex]["sfx"] if re.fullmatch(r"[A-Z0-9][A-Z0-9-]{0,7}", x or "") else None
+
+
+def intl_tickers():
+    import re
+    res = {}
+    for ex, cfg in INTL.items():
+        syms = []
+        try:
+            html = requests.get(cfg["url"], headers=WIKI_UA, timeout=30).text
+            if "rx" in cfg:
+                for m in re.findall(cfg["rx"], html):
+                    if isinstance(m, tuple):
+                        m = m[1]
+                    syms.append(_norm(ex, m))
+            if "col" in cfg or len(syms) < 10:
+                for grid in _wiki_tables(html):
+                    if not grid:
+                        continue
+                    hdr = [h.lower() for h in grid[0]]
+                    idx = [i for i, h in enumerate(hdr) if re.search(cfg.get("col", r"code|ticker|symbol"), h)]
+                    if not idx:
+                        continue
+                    for row in grid[1:]:
+                        if len(row) > idx[0]:
+                            syms.append(_norm(ex, row[idx[0]]))
+        except Exception as e:
+            log(f"  {cfg['n']}: לא הצלחתי לקרוא מוויקיפדיה ({e})")
+        syms = list(dict.fromkeys(x for x in syms if x))
+        fb = [_norm(ex, x) for x in cfg["fb"].split()]
+        if len(syms) < len(fb) * 0.6:
+            log(f"  {cfg['n']}: משתמש ברשימת הגיבוי")
+            syms = list(dict.fromkeys(syms + [x for x in fb if x]))
+        for t in syms:
+            res[t] = ex
+        log(f"  {cfg['n']}: {len(syms)} מניות")
+    return res
+
+
+def fetch_fx(ccys):
+    """כמה דולר שווה יחידה אחת של כל מטבע."""
+    import yfinance as yf
+    fx = {"USD": 1.0}
+    for c in ccys:
+        if c in fx:
+            continue
+        for sym, inv in ((f"{c}USD=X", False), (f"USD{c}=X", True)):
+            try:
+                h = yf.download(sym, period="1mo", progress=False, auto_adjust=False)
+                col = h["Close"]
+                v = float((col.iloc[:, 0] if hasattr(col, "columns") else col).dropna().iloc[-1])
+                if v > 0:
+                    fx[c] = 1 / v if inv else v
+                    break
+            except Exception:
+                pass
+        if c not in fx:
+            log(f"  אין שער עבור {c} — חברות במטבע הזה יידלגו")
+    return fx
 
 
 # ===================================================================
@@ -535,8 +708,20 @@ def section_score(checks):
     return round(100 * sum(c["w"] * c["s"] for c in checks if c["s"] is not None) / w, 1)
 
 
-def compute(u, F, s):
+def to_usd(F, fx):
+    """ממיר את כל הסכומים לדולר בשער אחד — שומר על יחסי הצמיחה כמו שהם."""
+    if fx == 1:
+        return F
+    mul = lambda v: None if v is None else v * fx
+    S = {k: ([mul(x) for x in v] if k in MONEY_KEYS else v) for k, v in F["s"].items()}
+    T = {k: (mul(v) if k in MONEY_KEYS else v) for k, v in F["ttm"].items()}
+    B = {k: (mul(v) if k in MONEY_KEYS else v) for k, v in F["bal"].items()}
+    return {**F, "s": S, "ttm": T, "bal": B}
+
+
+def compute(u, F, s, fx=1.0):
     C = CONFIG
+    F = to_usd(F, fx)
     S, T, B = F["s"], F["ttm"], F["bal"]
     fy = S["fy"]
     n = C["years"]
@@ -763,6 +948,8 @@ def compute(u, F, s):
         yellow.append("EPS היה שלילי בתחילת התקופה — צמיחה לא ניתנת לחישוב")
     if eq is not None and eq < 0:
         yellow.append("הון עצמי שלילי (בדרך כלל בגלל רכישות חוזרות) — ROIC לא אמין")
+    if F.get("tax") == "ifrs-full" or F.get("ccy", "USD") != "USD":
+        yellow.append(f"חברה זרה (מדווחת ב-{F.get('ccy', 'USD')}) — נתונים שנתיים בלבד, הומרו לדולר בשער של היום")
     fin = u["sector"] in ("Finance", "Real Estate")
     if fin:
         yellow.append("חברה פיננסית/נדל\"ן — FCF, ROIC ו-EBITDA פחות מתאימים לסקטור")
@@ -1057,6 +1244,203 @@ def ma150_info(close, days=160, pts=80):
 
 
 # ===================================================================
+#  4ד. תזמון וסיכון (ציון נפרד — לא נכנס לציון הראשי)
+# ===================================================================
+SECTOR_ETF = {"Technology": "XLK", "Finance": "XLF", "Health Care": "XLV", "Energy": "XLE", "Industrials": "XLI",
+              "Consumer Discretionary": "XLY", "Consumer Staples": "XLP", "Utilities": "XLU",
+              "Basic Materials": "XLB", "Real Estate": "XLRE", "Telecommunications": "XLC"}
+
+
+def rsi_series(s, n=14):
+    delta = s.diff()
+    up = delta.clip(lower=0).ewm(alpha=1 / n, adjust=False).mean()
+    dn = (-delta.clip(upper=0)).ewm(alpha=1 / n, adjust=False).mean()
+    rs = up / dn.replace(0, np.nan)
+    return (100 - 100 / (1 + rs)).fillna(50)
+
+
+def rsi_status(close):
+    """סטטוס RSI לפי כיוון וחציות — לא לפי הרמה בלבד."""
+    r = rsi_series(close)
+    v = r.values
+    if len(v) < 40:
+        return {"k": "na", "n": "—", "s": None, "rsi": None}
+    now = float(v[-1])
+    slope3 = v[-1] - v[-4]
+    new_low = close.iloc[-1] <= close.iloc[-20:].min() * 1.005
+
+    def crossed(level, hold, within=10):
+        for i in range(len(v) - within, len(v) - hold + 1):
+            if v[i - 1] < level <= v[i] and all(x >= level for x in v[i:]):
+                return True
+        return False
+
+    if now > 75 and slope3 > 0:
+        st = ("hot", "מתוח (מעל 75)", 0.5)
+    elif slope3 < -1 and now < 50 and new_low:
+        st = ("falling", "יורד — מומנטום שלילי", 0)
+    elif crossed(50, 3):
+        st = ("cross50", "חצה 50 והחזיק", 1)
+    elif crossed(30, 2):
+        st = ("cross30", "חצה 30 והחזיק", 1)
+    elif np.min(v[-10:]) < 30 and slope3 > 0:
+        st = ("turning", "יוצא ממכירת יתר", 0.5)
+    elif all(x > 50 for x in v[-5:]):
+        st = ("bull", "מעל 50 — מומנטום חיובי", 1)
+    elif slope3 < -1 and now < 50:
+        st = ("weak", "חלש ויורד", 0)
+    else:
+        st = ("neutral", "ניטרלי", 0.5)
+    return {"k": st[0], "n": st[1], "s": st[2], "rsi": round(now, 1)}
+
+
+def divergences(close):
+    """דייברג'נס רגיל: שורי בשפלים, דובי בשיאים (60 יום אחרונים)."""
+    c = close.values[-80:].astype(float)
+    r = rsi_series(close).values[-80:]
+    hi, lo = swings(c, 3)
+    out = []
+    lo = [i for i in lo if i >= len(c) - 60]
+    if len(lo) >= 2:
+        a, b = lo[-2], lo[-1]
+        if b >= len(c) - 25 and c[b] < c[a] and r[b] >= r[a] + 5 and r[a] < 35:
+            out.append("bull")
+    hi = [i for i in hi if i >= len(c) - 60]
+    if len(hi) >= 2:
+        a, b = hi[-2], hi[-1]
+        if b >= len(c) - 25 and c[b] > c[a] and r[b] <= r[a] - 5 and r[a] > 70:
+            out.append("bear")
+    return out
+
+
+def macd_state(close):
+    e12, e26 = close.ewm(span=12, adjust=False).mean(), close.ewm(span=26, adjust=False).mean()
+    m = e12 - e26
+    sig = m.ewm(span=9, adjust=False).mean()
+    d = (m - sig).values
+    cross = any(d[i - 1] <= 0 < d[i] for i in range(len(d) - 7, len(d)))
+    return {"above": bool(d[-1] > 0), "cross": bool(cross and d[-1] > 0)}
+
+
+def ret_n(s, n):
+    return float(s.iloc[-1] / s.iloc[-n - 1] - 1) if s is not None and len(s) > n else None
+
+
+def timing(close, vol, spy, sec, iv):
+    c = close
+    price = float(c.iloc[-1])
+    s50, s200 = c.rolling(50).mean(), c.rolling(200).mean()
+    T, flags = [], []
+
+    # --- מגמה ---
+    above200 = slope200 = None
+    if len(c) >= 225:
+        above200 = price / float(s200.iloc[-1]) - 1
+        slope200 = float(s200.iloc[-1] / s200.iloc[-21] - 1)
+        T.append(check("מעל ממוצע 200 (או קרוב אליו)", 1 if above200 >= 0 else (0.5 if above200 >= -0.05 and slope200 >= -0.005 else 0),
+                       f"{above200 * 100:+.1f}%", 2))
+        T.append(check("ממוצע 200 לא יורד", 1 if slope200 >= -0.002 else (0.5 if slope200 >= -0.01 else 0),
+                       "עולה" if slope200 > 0.002 else ("שטוח" if slope200 >= -0.002 else "יורד"), 1.5))
+    slope50 = float(s50.iloc[-1] / s50.iloc[-11] - 1) if len(c) >= 65 else None
+    if slope50 is not None:
+        T.append(check("ממוצע 50 שטוח או עולה", 1 if slope50 >= -0.003 else (0.5 if slope50 >= -0.015 else 0),
+                       "עולה" if slope50 > 0.003 else ("שטוח" if slope50 >= -0.003 else "יורד"), 1))
+
+    # --- חוזק יחסי ---
+    r1, r3 = ret_n(c, 21), ret_n(c, 63)
+    rs_spy = (r1 - ret_n(spy, 21)) if r1 is not None and ret_n(spy, 21) is not None else None
+    rs_sec = (r1 - ret_n(sec, 21)) if r1 is not None and sec is not None and ret_n(sec, 21) is not None else None
+    if rs_spy is not None:
+        T.append(check("חזקה מה-S&P 500 בחודש האחרון", 1 if rs_spy >= 0 else (0.5 if rs_spy >= -0.05 else 0), f"{rs_spy * 100:+.1f}%", 1.5))
+    if rs_sec is not None:
+        T.append(check("חזקה מהסקטור בחודש האחרון", 1 if rs_sec >= 0 else (0.5 if rs_sec >= -0.05 else 0), f"{rs_sec * 100:+.1f}%", 1))
+
+    # --- ווליום ---
+    breakdown = False
+    if vol is not None and len(vol) == len(c) and len(c) > 90:
+        ch = c.diff().values[-60:]
+        vv = vol.values[-60:].astype(float)
+        dn, up = vv[ch < 0], vv[ch > 0]
+        if len(dn) > 5 and len(up) > 5 and up.mean() > 0:
+            ratio = dn.mean() / up.mean()
+            T.append(check("מחזור נמוך בימי ירידה (מכירה נחלשת)", 1 if ratio <= 1.0 else (0.5 if ratio <= 1.3 else 0), f"{ratio:.2f}×", 1.5))
+        avg = float(np.mean(vol.values[-80:-20])) or 1
+        support = float(c.iloc[-80:-20].min())
+        for i in range(len(c) - 20, len(c)):
+            if c.iloc[i] < support * 0.99 and vol.iloc[i] >= 2 * avg:
+                breakdown = True
+        if breakdown:
+            flags.append("שבירת תמיכה במחזור כבד ב-20 הימים האחרונים")
+        T.append(check("אין שבירת תמיכה במחזור כבד", 0 if breakdown else 1, "נמצאה" if breakdown else "לא נמצאה", 1.5))
+
+    # --- ירידה מסודרת או קריסה ---
+    d1 = c.pct_change().values[-90:]
+    worst_i = int(np.nanargmin(d1))
+    worst = float(d1[worst_i])
+    worst_date = c.index[-90 + worst_i].strftime("%d/%m")
+    T.append(check("ירידה מסודרת (בלי נפילה חדה ביום אחד)", 1 if worst > -0.08 else (0.5 if worst > -0.15 else 0),
+                   f"הגרוע: {worst * 100:.1f}% ({worst_date})", 1.5))
+    if worst <= -0.15:
+        flags.append(f"נפילה של {worst * 100:.0f}% ביום אחד ב-{worst_date} — לבדוק מה קרה (דוח? אירוע?)")
+
+    # --- RSI חכם ---
+    rs = rsi_status(c)
+    weekly = c.resample("W-FRI").last().dropna()
+    wr = float(rsi_series(weekly).iloc[-1]) if len(weekly) > 30 else None
+    if rs["s"] is not None:
+        # בירידה מתחת לממוצע 200 יורד, RSI של 40–50 הוא ריבאונד חלש
+        sc = rs["s"]
+        if above200 is not None and above200 < 0 and slope200 < 0 and rs["k"] in ("neutral",) and 40 <= rs["rsi"] < 50:
+            sc, rs["n"] = 0, "ריבאונד חלש מתחת לממוצע 200"
+        T.append(check("סטטוס RSI יומי", sc, f"{rs['n']} ({rs['rsi']})", 2))
+    if wr is not None:
+        T.append(check("RSI שבועי (התמונה הגדולה)", 1 if wr >= 50 else (0.5 if wr >= 40 else 0), f"{wr:.0f}", 1))
+    dv = divergences(c)
+    if "bull" in dv:
+        T.append(check("דייברג'נס שורי (שפל נמוך במחיר, גבוה ב-RSI)", 1, "נמצא", 2))
+    if "bear" in dv:
+        flags.append("דייברג'נס דובי — המומנטום נחלש ליד השיא")
+    md = macd_state(c)
+    T.append(check("MACD מעל קו האות", 1 if md["above"] else 0, "חצה למעלה לאחרונה" if md["cross"] else ("מעל" if md["above"] else "מתחת"), 1))
+
+    # --- תמיכה ותוכנית סיכון ---
+    cv = c.values[-140:].astype(float)
+    hi, lo = swings(cv, 5)
+    lows_below = [cv[i] for i in lo if cv[i] < price * 0.995 and i >= len(cv) - 90]
+    cands = [x for x in lows_below]
+    for m in (s50.iloc[-1], s200.iloc[-1] if len(c) >= 200 else None):
+        if m is not None and math.isfinite(m) and m < price:
+            cands.append(float(m))
+    for i in hi:  # שיא קודם שנפרץ הופך לתמיכה
+        if cv[i] < price * 0.995 and i < len(cv) - 10:
+            cands.append(float(cv[i]))
+    support = max(cands) if cands else None
+    near_sup = (price / support - 1) if support else None
+    if near_sup is not None:
+        T.append(check("קרובה לתמיכה (עד 5% מעליה)", 1 if near_sup <= 0.05 else (0.5 if near_sup <= 0.10 else 0), f"{near_sup * 100:.1f}% מעל ${support:,.2f}", 1.5))
+    stop_base = lows_below[-1] if lows_below else float(np.min(cv[-20:]))
+    stop = stop_base * 0.98
+    risk = 1 - stop / price if price > stop else None
+    reward = (iv / price - 1) if iv and iv > price else None
+    rr = (reward / risk) if reward and risk and risk > 0.005 else None
+    if risk is not None:
+        T.append(check("יחס סיכוי-סיכון (מול השווי הפנימי)", None if rr is None else (1 if rr >= 3 else (0.5 if rr >= 2 else 0)),
+                       "—" if rr is None else ("מעל 10 : 1" if rr > 10 else f"{rr:.1f} : 1"), 2))
+
+    score = section_score(T)
+    new_low = bool(price <= float(c.iloc[-20:].min()) * 1.005)
+    downtrend = bool(above200 is not None and above200 < 0 and slope200 < 0)
+    red = (downtrend and (rs["k"] in ("falling", "weak") or (new_low and (rs["rsi"] or 50) < 40))) or breakdown
+    deep_down = bool(downtrend and above200 < -0.10)
+    light = "red" if red else ("green" if score is not None and score >= 65 and not deep_down else "amber")
+    return {"score": score, "light": light, "checks": T, "flags": flags,
+            "rsi": rs, "wrsi": None if wr is None else round(wr, 1), "div": dv, "macd": md,
+            "plan": {"stop": round(stop, 2), "risk": None if risk is None else round(risk, 4),
+                     "target": None if not iv else round(iv, 2), "reward": None if reward is None else round(reward, 4),
+                     "rr": None if rr is None else round(rr, 2), "support": None if support is None else round(support, 2)}}
+
+
+# ===================================================================
 #  4ג. יומן ביצועים חודשי
 # ===================================================================
 def load_journal():
@@ -1084,7 +1468,8 @@ def update_journal(j, results, patterns, closes, spy):
         j["snaps"].append({
             "month": month, "date": today.isoformat(), "spy": round(spy, 2),
             "stocks": [{"t": r["t"], "tier": r["tier"], "price": r["price"], "score": r["score"],
-                        "bottom": [b["k"] for b in r.get("bottom", [])]}
+                        "bottom": [b["k"] for b in r.get("bottom", [])],
+                        "light": (r.get("timing") or {}).get("light")}
                        for r in results if r["tier"] in ("green", "yellow")],
             "pats": [{"t": p["t"], "type": p.get("type", "stock"), "p": [x["k"] for x in p["pats"]], "st": [x["st"] for x in p["pats"]], "price": p["price"]}
                      for p in patterns],
@@ -1134,7 +1519,8 @@ def main():
     log(f"מוריד מחירים עבור {len(all_t)} מניות...")
     closes, vols = fetch_prices(list(dict.fromkeys(all_t)))
     log(f"מוריד מחירים עבור {len(etfs)} תעודות סל ו-{len(COINS)} מטבעות...")
-    c2, v2 = fetch_prices([t for t in list(etf_info) + list(COINS) if t not in closes], period="2y")
+    side_list = list(dict.fromkeys(list(etf_info) + list(COINS) + list(SECTOR_ETF.values())))
+    c2, v2 = fetch_prices([t for t in side_list if t not in closes], period="2y")
     for t in COINS:  # קריפטו נסחר 7 ימים בשבוע — משאירים ימי חול כדי שהתבניות יימדדו כמו במניות
         if t in c2:
             wk = c2[t].index.dayofweek < 5
@@ -1143,7 +1529,18 @@ def main():
                 v2[t] = v2[t][wk]
     closes.update(c2)
     vols.update(v2)
+    log("בורסות זרות:")
+    intl = intl_tickers() if not MAX_TICKERS else {}
+    if intl:
+        c3, v3 = fetch_prices([t for t in intl if t not in closes], period="2y")
+        closes.update(c3)
+        vols.update(v3)
     spy = float(closes["SPY"].iloc[-1]) if "SPY" in closes else None
+
+    ccys = {f.get("ccy", "USD") for f in fund.values()} - {"USD"}
+    fx = fetch_fx(sorted(ccys)) if ccys else {"USD": 1.0}
+    if ccys:
+        log(f"שערי מטבע: {', '.join(f'{k}={v:.4f}' for k, v in fx.items() if k != 'USD')}")
 
     state_path = DATA / "state.json"
     state = json.loads(state_path.read_text()) if state_path.exists() else {}
@@ -1156,7 +1553,10 @@ def main():
         if t not in fund or t not in closes:
             continue
         try:
-            r = compute(u, fund[t], closes[t])
+            ccy = fund[t].get("ccy", "USD")
+            if ccy not in fx:
+                continue
+            r = compute(u, fund[t], closes[t], fx[ccy])
         except Exception as e:
             errors += 1
             if errors <= 15:
@@ -1166,6 +1566,17 @@ def main():
             r["bottom"] = bottom_patterns(closes[t], vols.get(t))
         except Exception:
             r["bottom"] = []
+        try:
+            tm = timing(closes[t], vols.get(t), closes.get("SPY"), closes.get(SECTOR_ETF.get(u["sector"], "")), r.get("iv"))
+            r["timing"] = tm
+            r["yellow"].extend(tm["flags"])
+            if tm["light"] == "red" and r["tier"] == "green":
+                r["tier"] = "yellow"
+                r["yellow"].append("אור אדום בתזמון — ירדה מהרמה הירוקה (נראית כמו סכין נופלת)")
+        except Exception as e:
+            r["timing"] = None
+            if errors < 15:
+                log("  שגיאת תזמון", t, repr(e))
         prev = state.get(t)
         if prev is None or prev["tier"] != r["tier"]:
             improved = prev is None or rank[r["tier"]] > rank[prev["tier"]]
@@ -1192,7 +1603,7 @@ def main():
                          "vr": vol_ratio(vols[t].values.astype(float)) if t in vols else None,
                          "pats": pats, "chart": chart_points(closes[t])})
         d150, up150, line150 = ma150_info(closes[t])
-        patterns[-1].update({"ma150": d150, "ma150_up": up150, "ma150_line": line150})
+        patterns[-1].update({"ma150": d150, "ma150_up": up150, "ma150_line": line150, "rsi": rsi_status(closes[t])})
     # תעודות סל ומטבעות
     n_etf = 0
     for t in list(etf_info) + list(COINS):
@@ -1216,13 +1627,27 @@ def main():
                          "sector": "קריפטו" if typ != "etf" else "תעודת סל", "price": round(float(c.iloc[-1]), 4 if c.iloc[-1] < 1 else 2),
                          "cap": None, "tier": None, "score": None,
                          "vr": vol_ratio(vols[t].values.astype(float)) if t in vols else None,
-                         "pats": pats, "chart": chart_points(c), "ma150": d150, "ma150_up": up150, "ma150_line": line150})
+                         "pats": pats, "chart": chart_points(c), "ma150": d150, "ma150_up": up150, "ma150_line": line150,
+                         "rsi": rsi_status(c)})
     log(f"תעודות סל נזילות שנסרקו: {n_etf}")
+    for t, ex in intl.items():
+        if t not in closes:
+            continue
+        c = closes[t]
+        pats = tech_patterns(c, vols.get(t))
+        if not pats:
+            continue
+        d150, up150, line150 = ma150_info(c)
+        patterns.append({"t": t, "type": "intl", "ex": ex, "exn": INTL[ex]["n"], "ccy": INTL[ex]["ccy"], "name": t,
+                         "sector": "", "price": round(float(c.iloc[-1]), 2), "cap": None, "tier": None, "score": None,
+                         "vr": vol_ratio(vols[t].values.astype(float)) if t in vols else None,
+                         "pats": pats, "chart": chart_points(c), "ma150": d150, "ma150_up": up150, "ma150_line": line150,
+                         "rsi": rsi_status(c)})
     patterns.sort(key=lambda p: (0 if any(x["st"] == "breakout" for x in p["pats"]) else 1, -(p["vr"] or 0)))
     log(f"תבניות: {len(patterns)} מניות")
 
     state_path.write_text(json.dumps(state))
-    out = {"generated": dt.datetime.utcnow().isoformat() + "Z", "count": len(results), "config": CONFIG,
+    out = {"generated": dt.datetime.utcnow().isoformat() + "Z", "version": VERSION, "count": len(results), "config": CONFIG,
            "stocks": results, "patterns": patterns}
     (DATA / "results.json").write_text(json.dumps(clean(out), ensure_ascii=False, separators=(",", ":"), allow_nan=False))
 
