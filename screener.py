@@ -117,7 +117,7 @@ def sec_json(url, tries=4):
         time.sleep(3 + attempt * 5)
     raise RuntimeError(f"ה-SEC לא ענה עבור {url} — {last}")
 
-VERSION = "1.9.1"
+VERSION = "1.9.2"
 FULL = os.environ.get("FULL", "").lower() == "true"
 MAX_TICKERS = int(os.environ.get("MAX_TICKERS", "0") or 0)
 
@@ -1303,6 +1303,31 @@ def bottom_patterns(close, vol):
     return out
 
 
+def risk_stats(close, spy, hl=None):
+    """תנודה יומית ממוצעת (%) ובטא מול ה-S&P 500."""
+    c = close.astype(float)
+    atr = None
+    if hl is not None and len(hl[0]) >= 15:
+        hh, ll = hl
+        cv = c.values[-len(hh):]
+        prev = np.concatenate([[cv[0]], cv[:-1]])
+        tr = np.maximum(hh - ll, np.maximum(abs(hh - prev), abs(ll - prev)))
+        tr = tr[-20:]
+        tr = tr[np.isfinite(tr)]
+        if len(tr) >= 10:
+            atr = float(np.mean(tr / cv[-len(tr):]))
+    if atr is None and len(c) > 21:
+        atr = float(c.pct_change().abs().iloc[-20:].mean())
+    beta = None
+    if spy is not None and len(c) > 130:
+        j = pd.concat([c.pct_change(), spy.pct_change()], axis=1, join="inner").dropna().iloc[-252:]
+        if len(j) > 100 and j.iloc[:, 1].var() > 0:
+            beta = float(j.iloc[:, 0].cov(j.iloc[:, 1]) / j.iloc[:, 1].var())
+            if not -3 <= beta <= 5:  # ערך לא סביר — כנראה בעיה בנתונים
+                beta = None
+    return {"atr": None if atr is None else round(atr, 4), "beta": None if beta is None else round(beta, 2)}
+
+
 def chart_points(close, days=160, pts=80):
     c = close.values[-days:]
     idx = np.linspace(0, len(c) - 1, min(pts, len(c))).astype(int)
@@ -1798,6 +1823,7 @@ def main():
             tm = timing(closes[t], vols.get(t), closes.get("SPY"), closes.get(SECTOR_ETF.get(u["sector"], "")), r.get("iv"), HL.get(t), txs)
             r["timing"] = tm
             r["vol"] = volume_score(closes[t], vols.get(t), HL.get(t), txs)
+            r["risk"] = risk_stats(closes[t], closes.get("SPY"), HL.get(t))
             r["yellow"].extend(tm["flags"])
             if tm["light"] == "red" and r["tier"] == "green":
                 r["tier"] = "yellow"
@@ -1872,6 +1898,11 @@ def main():
                          "vr": vol_ratio(vols[t].values.astype(float)) if t in vols else None,
                          "pats": pats, "chart": chart_points(c), "ma150": d150, "ma150_up": up150, "ma150_line": line150,
                          "rsi": rsi_status(c), "vol": volume_score(c, vols.get(t), HL.get(t))})
+    for p in patterns:
+        try:
+            p["risk"] = risk_stats(closes[p["t"]], closes.get("SPY"), HL.get(p["t"]))
+        except Exception:
+            p["risk"] = None
     patterns.sort(key=lambda p: (0 if any(x["st"] == "breakout" for x in p["pats"]) else 1, -(p["vr"] or 0)))
     log(f"תבניות: {len(patterns)} מניות")
 

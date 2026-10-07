@@ -58,6 +58,7 @@ h1{font-size:26px;font-weight:700;margin:0;letter-spacing:-.01em}
 table{border-collapse:collapse;width:100%;min-width:960px}
 th,td{padding:10px 12px;text-align:start;border-bottom:1px solid var(--line);white-space:nowrap}
 th{font-size:12.5px;font-weight:600;color:var(--muted);background:var(--panel);position:sticky;top:0;cursor:pointer;user-select:none}
+th.srt::after{content:" ⇅";opacity:.7;font-size:13px;color:var(--blue)}
 th[aria-sort="descending"]::after{content:" ▼";font-size:10px}
 th[aria-sort="ascending"]::after{content:" ▲";font-size:10px}
 tbody tr{cursor:pointer}
@@ -131,6 +132,10 @@ section.blk h3 small{color:var(--muted);font-weight:500}
 .badge.btm{background:var(--amber-bg);color:var(--amber)}
 .mini{display:block;width:150px;height:40px}
 .ml{display:none}
+.msort{display:none;gap:8px;align-items:center;margin-bottom:10px}
+.msort select{flex:1;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+.msort button{padding:9px 14px;border:1px solid var(--line);border-radius:8px;background:var(--panel);font-weight:700;cursor:pointer}
+@media (max-width:700px){.msort{display:flex}}
 .note{max-width:1280px;margin:10px auto 0;padding:0 20px;color:var(--muted);font-size:13px}
 .cards{display:grid;gap:12px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
@@ -237,6 +242,19 @@ footer{max-width:1280px;margin:0 auto 30px;padding:0 20px;color:var(--muted);fon
       <option value="50000000">ווליום יומי: 50 מיליון+</option>
       <option value="100000000">ווליום יומי: 100 מיליון+</option>
     </select>
+<select id="datr" aria-label="תנודה יומית">
+      <option value="">כל רמות התנודה</option>
+      <option value="le2">תנודה יומית: עד 2%</option>
+      <option value="le3">תנודה יומית: עד 3%</option>
+      <option value="gt3">תנודה יומית: מעל 3%</option>
+      <option value="gt5">תנודה יומית: מעל 5%</option>
+    </select>
+    <select id="dbeta" aria-label="בטא">
+      <option value="">כל ערכי הבטא</option>
+      <option value="lt1">בטא: מתחת ל-1 (רגועה מהשוק)</option>
+      <option value="1to15">בטא: 1 עד 1.5</option>
+      <option value="gt15">בטא: מעל 1.5 (קופצנית מהשוק)</option>
+    </select>
   <label class="toggle"><input type="checkbox" id="onlynew"> רק חדשות</label>
   <label class="toggle"><input type="checkbox" id="nored"> בלי דגלים אדומים</label>
   <label class="toggle"><input type="checkbox" id="onlybtm"> רק עם תצורת תחתית</label>
@@ -244,6 +262,7 @@ footer{max-width:1280px;margin:0 auto 30px;padding:0 20px;color:var(--muted);fon
 </div>
 
 <div class="wrap">
+  <div class="msort"><select id="dsortk" aria-label="מיין לפי"></select><button id="dsortd" type="button" aria-label="הפוך כיוון">▼</button></div>
   <div class="tablebox cardtable">
     <table>
       <thead><tr id="thead"></tr></thead>
@@ -309,6 +328,19 @@ footer{max-width:1280px;margin:0 auto 30px;padding:0 20px;color:var(--muted);fon
       <option value="50000000">ווליום יומי: 50 מיליון+</option>
       <option value="100000000">ווליום יומי: 100 מיליון+</option>
     </select>
+<select id="patr" aria-label="תנודה יומית">
+      <option value="">כל רמות התנודה</option>
+      <option value="le2">תנודה יומית: עד 2%</option>
+      <option value="le3">תנודה יומית: עד 3%</option>
+      <option value="gt3">תנודה יומית: מעל 3%</option>
+      <option value="gt5">תנודה יומית: מעל 5%</option>
+    </select>
+    <select id="pbeta" aria-label="בטא">
+      <option value="">כל ערכי הבטא</option>
+      <option value="lt1">בטא: מתחת ל-1 (רגועה מהשוק)</option>
+      <option value="1to15">בטא: 1 עד 1.5</option>
+      <option value="gt15">בטא: מעל 1.5 (קופצנית מהשוק)</option>
+    </select>
     <select id="p150" aria-label="מרחק מממוצע 150">
       <option value="">כל מרחק מממוצע 150</option>
       <option value="5">עד 5% מממוצע 150</option>
@@ -320,8 +352,9 @@ footer{max-width:1280px;margin:0 auto 30px;padding:0 20px;color:var(--muted);fon
     <span class="count" id="pcount"></span>
   </div>
   <div class="wrap">
+    <div class="msort"><select id="psortk" aria-label="מיין לפי"></select><button id="psortd" type="button" aria-label="הפוך כיוון">▼</button></div>
     <div class="tablebox cardtable"><table>
-      <thead><tr><th>מניה</th><th>תבניות<button type="button" class="qm" data-k="pat" aria-label="מה זה תבניות?">?</button></th><th>מרחק מנקודת הפריצה</th><th>ווליום יחסי<button type="button" class="qm" data-k="rvol" aria-label="מה זה RVOL?">?</button></th><th>ציון ווליום<button type="button" class="qm" data-k="vol" aria-label="מה זה ציון ווליום?">?</button></th><th>עסקאות/יום<button type="button" class="qm" data-k="tx" aria-label="מה זה עסקאות ביום?">?</button></th><th>מרחק מממוצע 150<button type="button" class="qm" data-k="ma150" aria-label="מה זה מרחק מממוצע 150?">?</button></th><th>RSI<button type="button" class="qm" data-k="rsi" aria-label="מה זה RSI?">?</button></th><th>160 ימי מסחר</th><th>ציון Dip<button type="button" class="qm" data-k="score" aria-label="מה זה ציון?">?</button></th></tr></thead>
+      <thead><tr id="pthead"></tr></thead>
       <tbody id="prows"></tbody>
     </table><div class="empty" id="pempty" hidden>אין מניות שמתאימות לסינון.</div></div>
   </div>
@@ -351,7 +384,7 @@ const TIERS = {
 const TECH = {down:"🔻 בירידה", flat:"➖ מתייצבת", up:"🔼 מתאוששת"};
 const LIGHT = {green:"🟢", amber:"🟡", red:"🔴"};
 const LIGHTN = {green:"אור ירוק — התזמון תומך", amber:"אור צהוב — לחכות לאישור", red:"אור אדום — נראית כמו סכין נופלת"};
-const VERSION = "1.9.1";
+const VERSION = "1.9.2";
 const GL={
  score:["ציון","תעודה למניה מ-0 עד 100. ככל שגבוה יותר, החברה טובה יותר והמחיר שלה זול יותר."],
  tiers:["רמות","ירוקה = חברה טובה במחיר טוב. צהובה = חסר לה דבר אחד או שניים. מעקב = חברה טובה שעוד לא ירדה מספיק."],
@@ -396,11 +429,13 @@ const GL={
  hi52:["שיא 52 שבועות","המניה במחיר הגבוה ביותר שלה בשנה האחרונה."],
  golden:["Golden Cross","ממוצע 50 עבר מעל ממוצע 200 — סימן שהמגמה הכללית הפכה לחיובית."],
  ma150:["מרחק מממוצע 150","כמה המחיר רחוק מהממוצע. קרוב (עד 10%) = כניסה פחות מסוכנת. רחוק מאוד = המניה 'מתוחה'."],
+ atr:["תנודה יומית","בכמה אחוז המניה זזה ביום רגיל, בממוצע. 1% = רגועה, 4% ומעלה = קופצנית. ככל שגבוה יותר, צריך יותר מקום לנקודת הביטול."],
+ beta:["בטא","כמה המניה מגזימה ביחס לשוק. 1 = זזה כמו השוק. 2 = כשהשוק יורד 10%, היא יורדת בערך 20%. מתחת ל-1 = רגועה מהשוק."],
  journal:["יומן ביצועים","כל תחילת חודש הסורק מצלם את המניות הטובות ואת המחיר שלהן. ככה רואים אחר כך אם הן באמת עלו יותר מהשוק."]
 };
 const ML={"ציון":"score","ירידה מהשיא":"dd","Margin of Safety":"mos","P/FCF":"pfcf","P/E":"pe","ROIC":"roic","צמיחת הכנסות":"rev","תזמון":"timing",
  "ווליום":"vol","עסקאות ביום":"tx","מצב טכני":"tech","תצורת תחתית":"btm","דגלים":"flags","תבניות":"pat","מרחק מהפריצה":"pat","ווליום יחסי":"rvol",
- "ציון ווליום":"vol","מרחק מממוצע 150":"ma150","RSI":"rsi","ציון Dip":"score"};
+ "ציון ווליום":"vol","מרחק מממוצע 150":"ma150","RSI":"rsi","ציון Dip":"score","תנודה יומית":"atr","בטא":"beta"};
 const addML=html=>html.replace(/<td data-label="([^"]+)"([^>]*)>/g,(m,l,rest)=>`<td data-label="${l}"${rest}><span class="ml">${l}${ML[l]?qm(ML[l]):""}</span>`);
 const qm=k=>GL[k]?`<button type="button" class="qm" data-k="${k}" aria-label="מה זה ${GL[k][0]}?">?</button>`:"";
 const CHK_KEY=[["צמיחת הכנסות","rev"],["EPS","eps"],["FCF","fcf"],["ROIC","roic"],["Gross","gm"],["Operating","om"],["Net Debt","nd"],["Interest","ic"],["דילול","dil"],
@@ -420,6 +455,8 @@ const COLS = [
   {k:"timing", l:"תזמון", sort:s=>s.timing?s.timing.score:null},
   {k:"vol", l:"ווליום", sort:s=>s.vol?s.vol.score:null},
   {k:"tx", l:"עסקאות/יום", sort:s=>s.vol&&s.vol.tx?s.vol.tx.n20:null},
+  {k:"atr", l:"תנודה יומית", sort:s=>s.risk?s.risk.atr:null},
+  {k:"beta", l:"בטא", sort:s=>s.risk?s.risk.beta:null},
   {k:"tech", l:"מצב טכני", sort:s=>({down:0,flat:1,up:2})[s.tech.state]},
   {k:"btm", l:"תצורת תחתית", sort:s=>(s.bottom||[]).length},
   {k:"flags", l:"דגלים", sort:s=>s.red.length*10+s.yellow.length},
@@ -449,7 +486,13 @@ async function load(){
     $("sector").insertAdjacentHTML("beforeend", secs.map(s=>`<option>${esc(s)}</option>`).join(""));
     PATS = data.patterns||[];
     $("ver").textContent = `גרסת מסך ${VERSION} · גרסת סורק ${data.version||"ישנה"}`;
-    renderTiers(); renderHead(); apply(); renderPatChips(); applyPat();
+    $("dsortk").innerHTML=COLS.filter(c=>c.sort).map(c=>`<option value="${c.k}">מיין לפי: ${c.l}</option>`).join("");
+    $("psortk").innerHTML=`<option value="">מיין לפי: ברירת מחדל</option>`+PCOLS.filter(c=>c.sort).map(c=>`<option value="${c.k}">מיין לפי: ${c.l}</option>`).join("");
+    $("dsortk").onchange=()=>{st.key=$("dsortk").value; renderHead(); apply();};
+    $("dsortd").onclick=()=>{st.dir*=-1; renderHead(); apply();};
+    $("psortk").onchange=()=>{ps.key=$("psortk").value||null; renderPHead(); applyPat();};
+    $("psortd").onclick=()=>{ps.dir*=-1; renderPHead(); applyPat();};
+    renderTiers(); renderHead(); apply(); renderPHead(); renderPatChips(); applyPat();
   }catch(e){
     $("sub").textContent="";
     $("empty").hidden=false;
@@ -466,8 +509,9 @@ function renderTiers(){
 }
 
 function renderHead(){
-  const HK={score:"score",dd52:"dd",mos:"mos",pfcf:"pfcf",pe:"pe",roic:"roic",rev_g:"rev",timing:"timing",vol:"vol",tx:"tx",tech:"tech",btm:"btm",flags:"flags"};
-  $("thead").innerHTML = COLS.map((c,i)=>`<th data-i="${i}" ${c.k===st.key?`aria-sort="${st.dir<0?"descending":"ascending"}"`:""}>${c.l}${qm(HK[c.k])}</th>`).join("");
+  const HK={score:"score",dd52:"dd",mos:"mos",pfcf:"pfcf",pe:"pe",roic:"roic",rev_g:"rev",timing:"timing",vol:"vol",tx:"tx",tech:"tech",btm:"btm",flags:"flags",atr:"atr",beta:"beta"};
+  $("thead").innerHTML = COLS.map((c,i)=>`<th data-i="${i}" class="${c.sort?"srt":""}" ${c.k===st.key?`aria-sort="${st.dir<0?"descending":"ascending"}"`:""}>${c.l}${qm(HK[c.k])}</th>`).join("");
+  $("dsortk").value=st.key; $("dsortd").textContent=st.dir<0?"▼ מהגבוה":"▲ מהנמוך";
   $("thead").querySelectorAll("th").forEach(th=>th.onclick=()=>{
     const c=COLS[+th.dataset.i]; if(!c.sort) return;
     if(st.key===c.k) st.dir*=-1; else {st.key=c.k; st.dir=(c.k==="pfcf"||c.k==="pe"||c.k==="flags")?1:-1;}
@@ -477,11 +521,11 @@ function renderHead(){
 
 function apply(){
   const q=$("q").value.trim().toLowerCase(), sec=$("sector").value, tech=$("tech").value, dd=+$("dd").value;
-  const onlyNew=$("onlynew").checked, noRed=$("nored").checked, onlyBtm=$("onlybtm").checked, capf=$("capf").value, tmf=$("tmf").value, vf=$("vf").value, dtx=$("dtx").value, dav=$("dav").value;
+  const onlyNew=$("onlynew").checked, noRed=$("nored").checked, onlyBtm=$("onlybtm").checked, capf=$("capf").value, tmf=$("tmf").value, vf=$("vf").value, dtx=$("dtx").value, dav=$("dav").value, datr=$("datr").value, dbeta=$("dbeta").value;
   const capOk=c=>!capf||(capf==="small"?c<2:capf==="mid"?c>=2&&c<10:c>=10);
   view = ALL.filter(s=>
     (st.tier==="all"||s.tier===st.tier) && (!sec||s.sector===sec) && (!tech||s.tech.state===tech) &&
-    (s.dd52??0)>=dd && (!onlyNew||s.new) && (!noRed||!s.red.length) && (!onlyBtm||(s.bottom||[]).length) && capOk(s.cap) && (!tmf||(s.timing&&s.timing.light===tmf)) && (vf===""||(s.vol&&s.vol.score>=+vf)) && txOk(s.vol,dtx,dav) &&
+    (s.dd52??0)>=dd && (!onlyNew||s.new) && (!noRed||!s.red.length) && (!onlyBtm||(s.bottom||[]).length) && capOk(s.cap) && (!tmf||(s.timing&&s.timing.light===tmf)) && (vf===""||(s.vol&&s.vol.score>=+vf)) && txOk(s.vol,dtx,dav) && riskOk(s.risk,datr,dbeta) &&
     (!q||s.t.toLowerCase().includes(q)||s.name.toLowerCase().includes(q)));
   const c=COLS.find(c=>c.k===st.key);
   view.sort((a,b)=>{const x=c.sort(a),y=c.sort(b); if(x==null&&y==null)return 0; if(x==null)return 1; if(y==null)return -1; return (x>y?1:x<y?-1:0)*st.dir;});
@@ -505,6 +549,8 @@ function renderRows(){
     <td data-label="תזמון">${s.timing?`<span>${LIGHT[s.timing.light]} <span class="num">${s.timing.score==null?"—":s.timing.score.toFixed(0)}</span></span>`:'<span class="mut">—</span>'}</td>
     <td data-label="ווליום">${volCell(s.vol)}</td>
     <td data-label="עסקאות ביום" class="num">${s.vol&&s.vol.tx?`<span class="ltr">${fmtN(s.vol.tx.n20)}</span>`:'<span class="mut">—</span>'}</td>
+    <td data-label="תנודה יומית">${atrCell(s.risk)}</td>
+    <td data-label="בטא">${betaCell(s.risk)}</td>
     <td data-label="מצב טכני" class="tech">${TECH[s.tech.state]}</td>
     <td data-label="תצורת תחתית">${(s.bottom||[]).map(b=>`<span class="badge btm">${esc(b.n)}</span>`).join("")||'<span class="mut">—</span>'}</td>
     <td data-label="דגלים" class="flags">${s.red.length?`<span class="r">${s.red.length} אדומים</span> `:""}${s.yellow.length?`<span class="y">${s.yellow.length} צהובים</span>`:""}${!s.red.length&&!s.yellow.length?'<span class="mut">נקי</span>':""}</td>
@@ -536,6 +582,15 @@ function checks(title, list, score, color){
     return `<tr><td class="${cl}">${a}</td><td>${esc(c.l)}${qk(c.l)}</td><td><bdi class="num">${esc(c.v)}</bdi></td></tr>`}).join("")}</table></section>`;
 }
 
+const riskOk=(R,a,b)=>{
+  const atr=R&&R.atr, be=R&&R.beta;
+  if(a){ if(atr==null) return false; if(a==="le2"&&atr>0.02) return false; if(a==="le3"&&atr>0.03) return false; if(a==="gt3"&&atr<=0.03) return false; if(a==="gt5"&&atr<=0.05) return false; }
+  if(b){ if(be==null) return false; if(b==="lt1"&&be>=1) return false; if(b==="1to15"&&(be<1||be>1.5)) return false; if(b==="gt15"&&be<=1.5) return false; }
+  return true;
+};
+const atrCell=R=>R&&R.atr!=null?`<span class="ltr num ${R.atr>0.04?"neg":R.atr<=0.02?"pos":""}">${(R.atr*100).toFixed(1)}%</span>`:'<span class="mut">—</span>';
+const betaCell=R=>R&&R.beta!=null?`<span class="ltr num">${R.beta.toFixed(2)}</span>`:'<span class="mut">—</span>';
+const cmp=(f,dir)=>(a,b)=>{const x=f(a),y=f(b); if(x==null&&y==null)return 0; if(x==null)return 1; if(y==null)return -1; return (x>y?1:x<y?-1:0)*dir;};
 const txOk=(V,txv,avv)=>(txv===""||(V&&V.tx&&V.tx.n20>=+txv)) && (avv===""||(V&&V.av20>=+avv));
 const fmtN=x=>x==null?"—":x>=1e6?(x/1e6).toFixed(x>=1e7?0:1)+"M":x>=1e3?(x/1e3).toFixed(0)+"K":String(x);
 function volCell(V){
@@ -595,6 +650,7 @@ function openDrawer(t){
     ${checks("איכות החברה", s.checks.q, s.q, "var(--q)")}
     ${checks("תמחור", s.checks.v, s.v, "var(--v)")}
     ${checks("אופי הירידה", s.checks.d, s.d, "var(--d)")}
+    ${s.risk?`<div class="kv" style="margin-top:14px"><span>תנודה יומית${qm("atr")} <b>${atrCell(s.risk)}</b></span><span>בטא${qm("beta")} <b>${betaCell(s.risk)}</b></span></div>`:""}
     ${s.timing?timingBlock(s.timing):""}
     ${volBlock(s.vol)}
     <section class="blk"><h3><span>מגמות ${yrs}</span></h3><div class="sparks">
@@ -642,7 +698,7 @@ document.querySelectorAll(".filtbtn").forEach(b=>b.onclick=()=>{
 });
 addEventListener("scroll",()=>{$("tip").hidden=true},true);
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeDrawer()});
-["q","sector","tech","dd","capf","tmf","vf","dtx","dav","onlynew","nored","onlybtm"].forEach(id=>$(id).addEventListener("input",()=>{shown=100;apply()}));
+["q","sector","tech","dd","capf","tmf","vf","dtx","dav","datr","dbeta","onlynew","nored","onlybtm"].forEach(id=>$(id).addEventListener("input",()=>{shown=100;apply()}));
 $("more").onclick=()=>{shown+=100;renderRows()};
 
 // ---------- לשוניות ----------
@@ -655,7 +711,30 @@ function showView(v){
 document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>showView(b.dataset.v));
 
 // ---------- תבניות ----------
-let PATS=[], pk="";
+let PATS=[], pk="", ps={key:null, dir:-1};
+const PCOLS=[
+  {k:"t",l:"מניה",sort:p=>p.t},
+  {k:"pat",l:"תבניות",q:"pat",sort:p=>p.pats.some(x=>x.st==="breakout")?1:0},
+  {k:"dist",l:"מרחק מנקודת הפריצה",sort:p=>p.pats[0].dist},
+  {k:"vr",l:"ווליום יחסי",q:"rvol",sort:p=>p.vr},
+  {k:"vol",l:"ציון ווליום",q:"vol",sort:p=>p.vol?p.vol.score:null},
+  {k:"tx",l:"עסקאות/יום",q:"tx",sort:p=>p.vol&&p.vol.tx?p.vol.tx.n20:null},
+  {k:"ma150",l:"מרחק מממוצע 150",q:"ma150",sort:p=>p.ma150},
+  {k:"rsi",l:"RSI",q:"rsi",sort:p=>p.rsi?p.rsi.rsi:null},
+  {k:"atr",l:"תנודה יומית",q:"atr",sort:p=>p.risk?p.risk.atr:null},
+  {k:"beta",l:"בטא",q:"beta",sort:p=>p.risk?p.risk.beta:null},
+  {k:"chart",l:"160 ימי מסחר",sort:null},
+  {k:"score",l:"ציון Dip",q:"score",sort:p=>p.score},
+];
+function renderPHead(){
+  $("pthead").innerHTML=PCOLS.map((c,i)=>`<th data-i="${i}" class="${c.sort?"srt":""}" ${c.k===ps.key?`aria-sort="${ps.dir<0?"descending":"ascending"}"`:""}>${c.l}${c.q?qm(c.q):""}</th>`).join("");
+  $("pthead").querySelectorAll("th").forEach(th=>th.onclick=()=>{
+    const c=PCOLS[+th.dataset.i]; if(!c.sort) return;
+    if(ps.key===c.k) ps.dir*=-1; else {ps.key=c.k; ps.dir=(c.k==="t"||c.k==="atr")?1:-1;}
+    renderPHead(); applyPat();
+  });
+  $("psortk").value=ps.key||""; $("psortd").textContent=ps.dir<0?"▼ מהגבוה":"▲ מהנמוך";
+}
 const TYPEB={intl:'',etf:'<span class="badge">תעודת סל</span>',crypto_etf:'<span class="badge btm">קריפטו · תעודה</span>',coin:'<span class="badge btm">קריפטו</span>'};
 const PNAMES={cup:"ספל וידית",flat:"בסיס שטוח",flag:"דגל שורי",tri:"משולש עולה",hi52:"שיא 52 שבועות",golden:"Golden Cross"};
 function renderPatChips(){
@@ -677,14 +756,15 @@ function mini(p){
 function applyPat(){
   const q=$("pq").value.trim().toLowerCase(), st=$("pst").value, dip=$("pdip").checked;
   const m150=+$("p150").value, up150=$("p150up").checked, ptype=$("ptype").value;
-  const pvf=$("pvf").value, ptx=$("ptx").value, pav=$("pav").value;
+  const pvf=$("pvf").value, ptx=$("ptx").value, pav=$("pav").value, patr=$("patr").value, pbeta=$("pbeta").value;
   const pex=$("pex").value, exOk=p=>!pex||(pex==="US"?p.type!=="intl":p.ex===pex);
   const typeOk=t=>!ptype||(ptype==="crypto"?(t==="coin"||t==="crypto_etf"):(t||"stock")===ptype);
   const v=PATS.filter(p=>{
     const xs=p.pats.filter(x=>(!pk||x.k===pk)&&(!st||x.st===st));
-    return xs.length && typeOk(p.type) && exOk(p) && (pvf===""||(p.vol&&p.vol.score>=+pvf)) && txOk(p.vol,ptx,pav) && (!dip||p.tier==="green"||p.tier==="yellow") &&
+    return xs.length && typeOk(p.type) && exOk(p) && (pvf===""||(p.vol&&p.vol.score>=+pvf)) && txOk(p.vol,ptx,pav) && riskOk(p.risk,patr,pbeta) && (!dip||p.tier==="green"||p.tier==="yellow") &&
       (!m150||(p.ma150!=null&&Math.abs(p.ma150)*100<=m150)) && (!up150||p.ma150_up) && (!q||p.t.toLowerCase().includes(q)||p.name.toLowerCase().includes(q));
   });
+  if(ps.key){ const c=PCOLS.find(x=>x.k===ps.key); v.sort(cmp(c.sort,ps.dir)); }
   $("pcount").textContent=`${v.length.toLocaleString("he-IL")} תוצאות`;
   $("pempty").hidden=v.length>0;
   $("prows").innerHTML=addML(v.slice(0,300).map(p=>{
@@ -698,6 +778,8 @@ function applyPat(){
       <td data-label="עסקאות ביום" class="num">${p.vol&&p.vol.tx?`<span class="ltr">${fmtN(p.vol.tx.n20)}</span>`:'<span class="mut">—</span>'}</td>
       <td data-label="מרחק מממוצע 150">${p.ma150==null?'<span class="mut">—</span>':`<span class="ltr num ${Math.abs(p.ma150)<=0.10?"pos":p.ma150>0.25?"neg":""}">${(p.ma150>=0?"+":"")+(p.ma150*100).toFixed(1)}%</span> <span class="mut" title="כיוון הממוצע">${p.ma150_up?"↗":"↘"}</span>`}</td>
       <td data-label="RSI">${p.rsi&&p.rsi.rsi!=null?`<span class="${p.rsi.s===1?"pos":p.rsi.s===0?"neg":""}">${esc(p.rsi.n)}</span> <span class="mut ltr num">${p.rsi.rsi}</span>`:'<span class="mut">—</span>'}</td>
+      <td data-label="תנודה יומית">${atrCell(p.risk)}</td>
+      <td data-label="בטא">${betaCell(p.risk)}</td>
       <td data-label="גרף">${mini(p)}</td>
       <td data-label="ציון Dip">${p.score==null?'<span class="mut">—</span>':`<span class="dot ${p.tier}"></span><span class="num">${p.score.toFixed(0)}</span>`}</td>
     </tr>`}).join(""));
@@ -706,7 +788,7 @@ function applyPat(){
     tr.onclick=go; tr.onkeydown=e=>{if(e.key==="Enter")go()};
   });
 }
-["pq","ptype","pex","pst","pvf","ptx","pav","pdip","p150","p150up"].forEach(id=>$(id).addEventListener("input",applyPat));
+["pq","ptype","pex","pst","pvf","ptx","pav","patr","pbeta","pdip","p150","p150up"].forEach(id=>$(id).addEventListener("input",applyPat));
 
 // ---------- יומן ----------
 let JR=null;
