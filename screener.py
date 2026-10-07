@@ -117,7 +117,7 @@ def sec_json(url, tries=4):
         time.sleep(3 + attempt * 5)
     raise RuntimeError(f"ה-SEC לא ענה עבור {url} — {last}")
 
-VERSION = "1.9"
+VERSION = "1.9.1"
 FULL = os.environ.get("FULL", "").lower() == "true"
 MAX_TICKERS = int(os.environ.get("MAX_TICKERS", "0") or 0)
 
@@ -922,7 +922,9 @@ def compute(u, F, s, fx=1.0):
     # DCF פשוט ושמרני
     iv = mos = None
     g_in = [x for x in (rev_g, fcf_g) if x is not None]
-    is_fin = u["sector"] in ("Finance", "Real Estate")
+    import re as _re
+    is_fin = u["sector"] in ("Finance", "Real Estate") or bool(_re.search(
+        r"bank|insur|financ|credit|savings|investment manag|broker|real estate|reit", u.get("industry") or "", _re.I))
     if fcf_t and fcf_t > 0 and g_in and not is_fin:
         avg3 = np.mean([x for x in fcf[-3:] if x is not None] or [fcf_t])
         base = min(fcf_t, avg3 * 1.5) if avg3 > 0 else fcf_t
@@ -957,7 +959,7 @@ def compute(u, F, s, fx=1.0):
         check("EV/EBIT", None if ev_ebit is None else (1 if ev_ebit <= C["ev_ebit_max"] else (0.5 if ev_ebit <= C["ev_ebit_max"] * 1.3 else 0)), num(ev_ebit), 1),
         check("PEG (לפי צמיחה שמרנית)", 0 if peg_negative else (None if peg is None else (1 if peg <= 1 else (0.5 if peg <= C["peg_max"] else 0))),
               "צמיחה שלילית כרגע" if peg_negative else num(peg, 2), 1.5),
-        check("Margin of Safety (DCF שמרני)", None if mos is None else (1 if mos >= C["mos_good"] else (0.5 if mos >= C["mos_min"] else 0)),
+        check("Margin of Safety (DCF שמרני)", None if mos is None else (0.5 if mos > 0.75 else (1 if mos >= C["mos_good"] else (0.5 if mos >= C["mos_min"] else 0))),
               pct(mos) + ("" if iv is None else f" (שווי פנימי ${iv:,.0f})"), 3),
     ]
     cheap_signals = sum(1 for c in V if c["s"] == 1)
@@ -1021,7 +1023,9 @@ def compute(u, F, s, fx=1.0):
         yellow.append("הון עצמי שלילי (בדרך כלל בגלל רכישות חוזרות) — ROIC לא אמין")
     if F.get("tax") == "ifrs-full" or F.get("ccy", "USD") != "USD":
         yellow.append(f"חברה זרה (מדווחת ב-{F.get('ccy', 'USD')}) — נתונים שנתיים בלבד, הומרו לדולר בשער של היום")
-    fin = u["sector"] in ("Finance", "Real Estate")
+    fin = is_fin
+    if mos is not None and mos > 0.75:
+        yellow.append("שווי פנימי חריג (Margin of Safety מעל 75%) — כנראה שהחישוב לא מתאים לחברה הזו, למשל חברה מחזורית כמו נפט וגז")
     data_to = F.get("ttm_end") or fy[-1]
     stale = (dt.date.today() - d(data_to)).days > 450
     if stale:

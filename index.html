@@ -130,6 +130,7 @@ section.blk h3 small{color:var(--muted);font-weight:500}
 .badge.bo{background:var(--green-bg);color:var(--green)}
 .badge.btm{background:var(--amber-bg);color:var(--amber)}
 .mini{display:block;width:150px;height:40px}
+.ml{display:none}
 .note{max-width:1280px;margin:10px auto 0;padding:0 20px;color:var(--muted);font-size:13px}
 .cards{display:grid;gap:12px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
@@ -142,8 +143,8 @@ section.blk h3 small{color:var(--muted);font-weight:500}
 .card details{margin-top:12px}
 .card summary{cursor:pointer;color:var(--blue);font-size:14px}
 .card table{min-width:640px}
-.qm{display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;border:1px solid var(--line);
-  background:var(--panel);color:var(--muted);font-size:11px;font-weight:700;cursor:pointer;margin-inline-start:5px;padding:0;vertical-align:middle;line-height:1}
+.qm{display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;border-radius:50%;border:1px solid var(--blue);
+  background:var(--blue-bg);color:var(--blue);font-size:12px;font-weight:700;cursor:pointer;margin-inline-start:5px;padding:0;vertical-align:middle;line-height:1}
 .qm:hover,.qm:focus-visible{color:var(--blue);border-color:var(--blue)}
 #tip{position:fixed;z-index:20;max-width:300px;background:var(--ink);color:var(--panel);border-radius:8px;padding:10px 12px;font-size:13.5px;
   line-height:1.55;box-shadow:0 6px 24px rgba(0,0,0,.25);font-weight:400;white-space:normal}
@@ -153,9 +154,9 @@ section.blk h3 small{color:var(--muted);font-weight:500}
   .cardtable thead{display:none}
   .cardtable tbody tr{display:block;border-bottom:8px solid var(--bg);padding:10px 12px}
   .cardtable tbody td{display:flex;justify-content:space-between;align-items:center;gap:12px;border:0;padding:5px 0;white-space:normal}
-  .cardtable tbody td::before{content:attr(data-label);color:var(--muted);font-size:12.5px;flex:none}
+  .cardtable tbody td .ml{display:inline-flex;align-items:center;color:var(--muted);font-size:12.5px;flex:none}
   .cardtable tbody td.lead{display:block;padding-bottom:8px;border-bottom:1px solid var(--line);margin-bottom:4px}
-  .cardtable tbody td.lead::before{content:none}
+  .cardtable tbody td.lead .ml{display:none}
   .cardtable tbody td.hide-m{display:none}
   .cardtable .nm{max-width:none}
   .tools select,.tools .toggle{flex:1 1 46%}
@@ -183,7 +184,8 @@ footer{max-width:1280px;margin:0 auto 30px;padding:0 20px;color:var(--muted);fon
 </nav>
 
 <div id="view-dip">
-<div class="tiers" id="tiers"></div>
+<p class="note" style="margin-top:12px">הרמות <button type="button" class="qm" data-k="tiers" aria-label="מה זה הרמות?">?</button> · לחיצה על כל ❓ מסבירה את המושג במילים פשוטות</p>
+<div class="tiers" id="tiers" style="margin-top:6px"></div>
 
 <button class="filtbtn" data-for="dip" aria-expanded="false">חיפוש ומסננים ▾</button>
 <div class="tools filt" data-v="dip">
@@ -349,7 +351,7 @@ const TIERS = {
 const TECH = {down:"🔻 בירידה", flat:"➖ מתייצבת", up:"🔼 מתאוששת"};
 const LIGHT = {green:"🟢", amber:"🟡", red:"🔴"};
 const LIGHTN = {green:"אור ירוק — התזמון תומך", amber:"אור צהוב — לחכות לאישור", red:"אור אדום — נראית כמו סכין נופלת"};
-const VERSION = "1.9";
+const VERSION = "1.9.1";
 const GL={
  score:["ציון","תעודה למניה מ-0 עד 100. ככל שגבוה יותר, החברה טובה יותר והמחיר שלה זול יותר."],
  tiers:["רמות","ירוקה = חברה טובה במחיר טוב. צהובה = חסר לה דבר אחד או שניים. מעקב = חברה טובה שעוד לא ירדה מספיק."],
@@ -396,6 +398,10 @@ const GL={
  ma150:["מרחק מממוצע 150","כמה המחיר רחוק מהממוצע. קרוב (עד 10%) = כניסה פחות מסוכנת. רחוק מאוד = המניה 'מתוחה'."],
  journal:["יומן ביצועים","כל תחילת חודש הסורק מצלם את המניות הטובות ואת המחיר שלהן. ככה רואים אחר כך אם הן באמת עלו יותר מהשוק."]
 };
+const ML={"ציון":"score","ירידה מהשיא":"dd","Margin of Safety":"mos","P/FCF":"pfcf","P/E":"pe","ROIC":"roic","צמיחת הכנסות":"rev","תזמון":"timing",
+ "ווליום":"vol","עסקאות ביום":"tx","מצב טכני":"tech","תצורת תחתית":"btm","דגלים":"flags","תבניות":"pat","מרחק מהפריצה":"pat","ווליום יחסי":"rvol",
+ "ציון ווליום":"vol","מרחק מממוצע 150":"ma150","RSI":"rsi","ציון Dip":"score"};
+const addML=html=>html.replace(/<td data-label="([^"]+)"([^>]*)>/g,(m,l,rest)=>`<td data-label="${l}"${rest}><span class="ml">${l}${ML[l]?qm(ML[l]):""}</span>`);
 const qm=k=>GL[k]?`<button type="button" class="qm" data-k="${k}" aria-label="מה זה ${GL[k][0]}?">?</button>`:"";
 const CHK_KEY=[["צמיחת הכנסות","rev"],["EPS","eps"],["FCF","fcf"],["ROIC","roic"],["Gross","gm"],["Operating","om"],["Net Debt","nd"],["Interest","ic"],["דילול","dil"],
  ["P/E","pe"],["P/FCF","pfcf"],["EV/","ev"],["PEG","peg"],["Margin of Safety","mos"],["מדדים מצביעים","pe"],["ירידה מהשיא","dd"],["ההכנסות","rev"],["קפיצה בחוב","nd"],
@@ -486,7 +492,7 @@ function renderRows(){
   $("count").textContent = `${view.length.toLocaleString("he-IL")} תוצאות`;
   $("empty").hidden = view.length>0;
   if(!view.length) $("empty").textContent="אין מניות שמתאימות לסינון. נסה להרחיב אחד המסננים.";
-  $("rows").innerHTML = view.slice(0,shown).map((s,i)=>`<tr data-t="${esc(s.t)}" tabindex="0">
+  $("rows").innerHTML = addML(view.slice(0,shown).map((s,i)=>`<tr data-t="${esc(s.t)}" tabindex="0">
     <td class="mut num hide-m">${i+1}</td>
     <td class="lead"><span class="dot ${s.tier}"></span><span class="tk ltr">${esc(s.t)}</span>${s.new?'<span class="new">חדש</span>':""}<span class="nm">${esc(s.name)}</span></td>
     <td data-label="ציון"><div class="score"><b class="num">${s.score.toFixed(0)}</b>${bar(s)}</div></td>
@@ -502,7 +508,7 @@ function renderRows(){
     <td data-label="מצב טכני" class="tech">${TECH[s.tech.state]}</td>
     <td data-label="תצורת תחתית">${(s.bottom||[]).map(b=>`<span class="badge btm">${esc(b.n)}</span>`).join("")||'<span class="mut">—</span>'}</td>
     <td data-label="דגלים" class="flags">${s.red.length?`<span class="r">${s.red.length} אדומים</span> `:""}${s.yellow.length?`<span class="y">${s.yellow.length} צהובים</span>`:""}${!s.red.length&&!s.yellow.length?'<span class="mut">נקי</span>':""}</td>
-  </tr>`).join("");
+  </tr>`).join(""));
   $("more").hidden = view.length<=shown;
   $("rows").querySelectorAll("tr").forEach(tr=>{
     tr.onclick=()=>openDrawer(tr.dataset.t);
@@ -681,7 +687,7 @@ function applyPat(){
   });
   $("pcount").textContent=`${v.length.toLocaleString("he-IL")} תוצאות`;
   $("pempty").hidden=v.length>0;
-  $("prows").innerHTML=v.slice(0,300).map(p=>{
+  $("prows").innerHTML=addML(v.slice(0,300).map(p=>{
     const xs=p.pats.filter(x=>!pk||x.k===pk), main=xs[0];
     return `<tr data-t="${esc(p.t)}" tabindex="0">
       <td class="lead"><span class="tk ltr">${esc(p.type==="coin"?p.t.replace("-USD",""):p.t)}</span>${p.type==="intl"?`<span class="badge">${esc(p.exn)}</span>`:(TYPEB[p.type]||"")}<span class="nm">${p.type==="intl"?`מחיר: <span class="ltr num">${p.price}</span> ${esc(p.ccy)}`:esc(p.name)}</span></td>
@@ -694,7 +700,7 @@ function applyPat(){
       <td data-label="RSI">${p.rsi&&p.rsi.rsi!=null?`<span class="${p.rsi.s===1?"pos":p.rsi.s===0?"neg":""}">${esc(p.rsi.n)}</span> <span class="mut ltr num">${p.rsi.rsi}</span>`:'<span class="mut">—</span>'}</td>
       <td data-label="גרף">${mini(p)}</td>
       <td data-label="ציון Dip">${p.score==null?'<span class="mut">—</span>':`<span class="dot ${p.tier}"></span><span class="num">${p.score.toFixed(0)}</span>`}</td>
-    </tr>`}).join("");
+    </tr>`}).join(""));
   $("prows").querySelectorAll("tr").forEach(tr=>{
     const go=()=>{ if(ALL.find(s=>s.t===tr.dataset.t)) openDrawer(tr.dataset.t); else window.open("https://finance.yahoo.com/quote/"+encodeURIComponent(tr.dataset.t),"_blank","noopener"); };
     tr.onclick=go; tr.onkeydown=e=>{if(e.key==="Enter")go()};
