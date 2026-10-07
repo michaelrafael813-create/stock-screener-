@@ -58,9 +58,10 @@ h1{font-size:26px;font-weight:700;margin:0;letter-spacing:-.01em}
 table{border-collapse:collapse;width:100%;min-width:960px}
 th,td{padding:10px 12px;text-align:start;border-bottom:1px solid var(--line);white-space:nowrap}
 th{font-size:12.5px;font-weight:600;color:var(--muted);background:var(--panel);position:sticky;top:0;cursor:pointer;user-select:none}
-th.srt::after{content:" ⇅";opacity:.7;font-size:13px;color:var(--blue)}
-th[aria-sort="descending"]::after{content:" ▼";font-size:10px}
-th[aria-sort="ascending"]::after{content:" ▲";font-size:10px}
+th.srt::before{content:"⇅";opacity:.7;font-size:13px;color:var(--blue);margin-inline-end:6px}
+th[aria-sort="descending"]::before{content:"▼";font-size:11px;opacity:1;color:var(--blue);margin-inline-end:6px}
+th[aria-sort="ascending"]::before{content:"▲";font-size:11px;opacity:1;color:var(--blue);margin-inline-end:6px}
+th .qm{margin-inline-start:10px}
 tbody tr{cursor:pointer}
 tbody tr:hover{background:var(--hover)}
 tbody tr:last-child td{border-bottom:0}
@@ -384,7 +385,7 @@ const TIERS = {
 const TECH = {down:"🔻 בירידה", flat:"➖ מתייצבת", up:"🔼 מתאוששת"};
 const LIGHT = {green:"🟢", amber:"🟡", red:"🔴"};
 const LIGHTN = {green:"אור ירוק — התזמון תומך", amber:"אור צהוב — לחכות לאישור", red:"אור אדום — נראית כמו סכין נופלת"};
-const VERSION = "1.9.2";
+const VERSION = "1.9.3";
 const GL={
  score:["ציון","תעודה למניה מ-0 עד 100. ככל שגבוה יותר, החברה טובה יותר והמחיר שלה זול יותר."],
  tiers:["רמות","ירוקה = חברה טובה במחיר טוב. צהובה = חסר לה דבר אחד או שניים. מעקב = חברה טובה שעוד לא ירדה מספיק."],

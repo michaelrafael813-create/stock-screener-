@@ -117,7 +117,7 @@ def sec_json(url, tries=4):
         time.sleep(3 + attempt * 5)
     raise RuntimeError(f"ה-SEC לא ענה עבור {url} — {last}")
 
-VERSION = "1.9.2"
+VERSION = "1.9.3"
 FULL = os.environ.get("FULL", "").lower() == "true"
 MAX_TICKERS = int(os.environ.get("MAX_TICKERS", "0") or 0)
 
