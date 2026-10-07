@@ -117,7 +117,7 @@ def sec_json(url, tries=4):
         time.sleep(3 + attempt * 5)
     raise RuntimeError(f"ה-SEC לא ענה עבור {url} — {last}")
 
-VERSION = "1.8"
+VERSION = "1.9"
 FULL = os.environ.get("FULL", "").lower() == "true"
 MAX_TICKERS = int(os.environ.get("MAX_TICKERS", "0") or 0)
 
@@ -922,7 +922,8 @@ def compute(u, F, s, fx=1.0):
     # DCF פשוט ושמרני
     iv = mos = None
     g_in = [x for x in (rev_g, fcf_g) if x is not None]
-    if fcf_t and fcf_t > 0 and g_in:
+    is_fin = u["sector"] in ("Finance", "Real Estate")
+    if fcf_t and fcf_t > 0 and g_in and not is_fin:
         avg3 = np.mean([x for x in fcf[-3:] if x is not None] or [fcf_t])
         base = min(fcf_t, avg3 * 1.5) if avg3 > 0 else fcf_t
         g_hist = float(np.mean(g_in))
@@ -1021,8 +1022,12 @@ def compute(u, F, s, fx=1.0):
     if F.get("tax") == "ifrs-full" or F.get("ccy", "USD") != "USD":
         yellow.append(f"חברה זרה (מדווחת ב-{F.get('ccy', 'USD')}) — נתונים שנתיים בלבד, הומרו לדולר בשער של היום")
     fin = u["sector"] in ("Finance", "Real Estate")
+    data_to = F.get("ttm_end") or fy[-1]
+    stale = (dt.date.today() - d(data_to)).days > 450
+    if stale:
+        yellow.append(f"הדוחות האחרונים שנמצאו ישנים (עד {data_to}) — המספרים עלולים לא לשקף את המצב היום")
     if fin:
-        yellow.append("חברה פיננסית/נדל\"ן — FCF, ROIC ו-EBITDA פחות מתאימים לסקטור")
+        yellow.append("חברה פיננסית/נדל\"ן — המדדים של מזומן חופשי, ROIC ו-EBITDA פחות מתאימים לה, ולכן לא מחושב לה שווי פנימי")
     if dd5 - dd52 > 0.15:
         yellow.append(f"המניה {pct(dd5)} מתחת לשיא של 5 שנים")
 
@@ -1040,7 +1045,7 @@ def compute(u, F, s, fx=1.0):
 
     if coverage < 0.5:
         tier = "nodata"
-    elif score >= 70 and not red and dd52 >= C["dip_min"] and (qs or 0) >= 65 and not fin:
+    elif score >= 70 and not red and dd52 >= C["dip_min"] and (qs or 0) >= 65 and not fin and not stale:
         tier = "green"
     elif score >= 55 and len(red) <= 1 and dd52 >= 0.12:
         tier = "yellow"

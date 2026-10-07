@@ -118,6 +118,8 @@ section.blk h3 small{color:var(--muted);font-weight:500}
 .manual li{margin:4px 0;font-size:13.5px}
 .links{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
 .links a{color:var(--blue);text-decoration:none;border:1px solid var(--line);border-radius:6px;padding:5px 10px;font-size:13px}
+.filtbtn{display:none;max-width:1280px;margin:12px 20px 0;padding:9px 14px;border:1px solid var(--line);border-radius:8px;background:var(--panel);font-weight:600;cursor:pointer}
+@media (max-width:700px){ .filtbtn{display:block;width:calc(100% - 40px)} .filt{display:none!important} .filt.open{display:flex!important} }
 .tabs{max-width:1280px;margin:4px auto 0;padding:0 20px;display:flex;gap:4px;border-bottom:1px solid var(--line);overflow-x:auto}
 .tabs button{border:0;background:none;padding:10px 14px;font-weight:600;color:var(--muted);border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap}
 .tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--ink)}
@@ -140,6 +142,24 @@ section.blk h3 small{color:var(--muted);font-weight:500}
 .card details{margin-top:12px}
 .card summary{cursor:pointer;color:var(--blue);font-size:14px}
 .card table{min-width:640px}
+.qm{display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;border:1px solid var(--line);
+  background:var(--panel);color:var(--muted);font-size:11px;font-weight:700;cursor:pointer;margin-inline-start:5px;padding:0;vertical-align:middle;line-height:1}
+.qm:hover,.qm:focus-visible{color:var(--blue);border-color:var(--blue)}
+#tip{position:fixed;z-index:20;max-width:300px;background:var(--ink);color:var(--panel);border-radius:8px;padding:10px 12px;font-size:13.5px;
+  line-height:1.55;box-shadow:0 6px 24px rgba(0,0,0,.25);font-weight:400;white-space:normal}
+#tip b{display:block;margin-bottom:3px}
+@media (max-width:700px){
+  .cardtable table{min-width:0}
+  .cardtable thead{display:none}
+  .cardtable tbody tr{display:block;border-bottom:8px solid var(--bg);padding:10px 12px}
+  .cardtable tbody td{display:flex;justify-content:space-between;align-items:center;gap:12px;border:0;padding:5px 0;white-space:normal}
+  .cardtable tbody td::before{content:attr(data-label);color:var(--muted);font-size:12.5px;flex:none}
+  .cardtable tbody td.lead{display:block;padding-bottom:8px;border-bottom:1px solid var(--line);margin-bottom:4px}
+  .cardtable tbody td.lead::before{content:none}
+  .cardtable tbody td.hide-m{display:none}
+  .cardtable .nm{max-width:none}
+  .tools select,.tools .toggle{flex:1 1 46%}
+}
 footer{max-width:1280px;margin:0 auto 30px;padding:0 20px;color:var(--muted);font-size:12.5px}
 @media (max-width:640px){
   header{padding-top:18px} h1{font-size:22px}
@@ -156,7 +176,7 @@ footer{max-width:1280px;margin:0 auto 30px;padding:0 20px;color:var(--muted);fon
   </div>
 </header>
 
-<nav class="tabs" role="tablist">
+<nav class="tabs" role="tablist" aria-label="לשוניות">
   <button role="tab" data-v="dip" aria-selected="true">Buy the Dip</button>
   <button role="tab" data-v="pat" aria-selected="false">תבניות טכניות</button>
   <button role="tab" data-v="jr" aria-selected="false">יומן ביצועים</button>
@@ -165,7 +185,8 @@ footer{max-width:1280px;margin:0 auto 30px;padding:0 20px;color:var(--muted);fon
 <div id="view-dip">
 <div class="tiers" id="tiers"></div>
 
-<div class="tools">
+<button class="filtbtn" data-for="dip" aria-expanded="false">חיפוש ומסננים ▾</button>
+<div class="tools filt" data-v="dip">
   <input type="search" id="q" placeholder="חיפוש לפי שם או סימול" aria-label="חיפוש">
   <select id="sector" aria-label="סקטור"><option value="">כל הסקטורים</option></select>
   <select id="tech" aria-label="מצב טכני">
@@ -221,7 +242,7 @@ footer{max-width:1280px;margin:0 auto 30px;padding:0 20px;color:var(--muted);fon
 </div>
 
 <div class="wrap">
-  <div class="tablebox">
+  <div class="tablebox cardtable">
     <table>
       <thead><tr id="thead"></tr></thead>
       <tbody id="rows"></tbody>
@@ -237,7 +258,8 @@ footer{max-width:1280px;margin:0 auto 30px;padding:0 20px;color:var(--muted);fon
   <div class="tools">
     <div class="chips" id="patchips"></div>
   </div>
-  <div class="tools">
+  <button class="filtbtn" data-for="pat" aria-expanded="false">חיפוש ומסננים ▾</button>
+  <div class="tools filt" data-v="pat">
     <input type="search" id="pq" placeholder="חיפוש לפי שם או סימול" aria-label="חיפוש תבניות">
     <select id="ptype" aria-label="סוג נכס">
       <option value="">כל סוגי הנכסים</option>
@@ -296,15 +318,15 @@ footer{max-width:1280px;margin:0 auto 30px;padding:0 20px;color:var(--muted);fon
     <span class="count" id="pcount"></span>
   </div>
   <div class="wrap">
-    <div class="tablebox"><table>
-      <thead><tr><th>מניה</th><th>תבניות</th><th>מרחק מנקודת הפריצה</th><th>ווליום יחסי</th><th>ציון ווליום</th><th>עסקאות/יום</th><th>מרחק מממוצע 150</th><th>RSI</th><th>160 ימי מסחר</th><th>ציון Dip</th></tr></thead>
+    <div class="tablebox cardtable"><table>
+      <thead><tr><th>מניה</th><th>תבניות<button type="button" class="qm" data-k="pat" aria-label="מה זה תבניות?">?</button></th><th>מרחק מנקודת הפריצה</th><th>ווליום יחסי<button type="button" class="qm" data-k="rvol" aria-label="מה זה RVOL?">?</button></th><th>ציון ווליום<button type="button" class="qm" data-k="vol" aria-label="מה זה ציון ווליום?">?</button></th><th>עסקאות/יום<button type="button" class="qm" data-k="tx" aria-label="מה זה עסקאות ביום?">?</button></th><th>מרחק מממוצע 150<button type="button" class="qm" data-k="ma150" aria-label="מה זה מרחק מממוצע 150?">?</button></th><th>RSI<button type="button" class="qm" data-k="rsi" aria-label="מה זה RSI?">?</button></th><th>160 ימי מסחר</th><th>ציון Dip<button type="button" class="qm" data-k="score" aria-label="מה זה ציון?">?</button></th></tr></thead>
       <tbody id="prows"></tbody>
     </table><div class="empty" id="pempty" hidden>אין מניות שמתאימות לסינון.</div></div>
   </div>
 </div>
 
 <div id="view-jr" hidden>
-  <p class="note">בתחילת כל חודש הסורק שומר "צילום" של המניות הירוקות, הצהובות ושל מניות התבניות, עם המחיר שלהן באותו יום. כאן רואים מה קרה איתן מאז, לעומת S&amp;P 500.</p>
+  <p class="note"><button type="button" class="qm" data-k="journal" aria-label="מה זה יומן ביצועים?">?</button> בתחילת כל חודש הסורק שומר "צילום" של המניות הירוקות, הצהובות ושל מניות התבניות, עם המחיר שלהן באותו יום. כאן רואים מה קרה איתן מאז, לעומת S&amp;P 500.</p>
   <div class="wrap"><div class="cards" id="jcards"></div></div>
 </div>
 
@@ -327,9 +349,60 @@ const TIERS = {
 const TECH = {down:"🔻 בירידה", flat:"➖ מתייצבת", up:"🔼 מתאוששת"};
 const LIGHT = {green:"🟢", amber:"🟡", red:"🔴"};
 const LIGHTN = {green:"אור ירוק — התזמון תומך", amber:"אור צהוב — לחכות לאישור", red:"אור אדום — נראית כמו סכין נופלת"};
-const VERSION = "1.8";
+const VERSION = "1.9";
+const GL={
+ score:["ציון","תעודה למניה מ-0 עד 100. ככל שגבוה יותר, החברה טובה יותר והמחיר שלה זול יותר."],
+ tiers:["רמות","ירוקה = חברה טובה במחיר טוב. צהובה = חסר לה דבר אחד או שניים. מעקב = חברה טובה שעוד לא ירדה מספיק."],
+ rev:["צמיחת הכנסות","בכמה אחוז גדל כל שנה הכסף שנכנס לקופה של החברה. אנחנו רוצים לפחות 8%."],
+ eps:["EPS — רווח למניה","כמה רווח נשאר אחרי כל ההוצאות, לכל מניה. אנחנו רוצים שיגדל."],
+ fcf:["FCF — מזומן חופשי","הכסף שבאמת נשאר ביד אחרי שהחברה שילמה על הכל, כולל ציוד חדש. זה הכסף האמיתי."],
+ roic:["ROIC","כמה מרוויח הכסף שהושקע בעסק. השקעת מיליון והעסק מרוויח 200 אלף בשנה = 20%. מעל 15% זה עסק מעולה."],
+ gm:["שולי רווח גולמי","מכל 100 שקל מכירות, כמה נשארים אחרי עלות המוצר עצמו. אנחנו רוצים שלא יירד."],
+ om:["שולי רווח תפעולי","מכל 100 שקל מכירות, כמה נשארים אחרי כל הוצאות העסק. אנחנו רוצים שלא יירד."],
+ nd:["חוב נטו / EBITDA","בכמה שנים החברה יכולה להחזיר את החוב שלה מהרווח. פחות משנתיים זה בריא."],
+ ic:["כיסוי ריבית","פי כמה הרווח גדול מתשלומי הריבית. ככל שגבוה יותר, בטוח יותר."],
+ dil:["דילול","כשהחברה מדפיסה מניות חדשות, החלק שלך בעוגה קטן. אנחנו רוצים שמספר המניות לא יגדל."],
+ pe:["P/E — מכפיל רווח","כמה שנים של רווח אתה משלם כשאתה קונה את החברה. נמוך = זול יותר. 'מול ההיסטוריה' = לעומת מה שהיה בדרך כלל אצל אותה חברה."],
+ pfcf:["P/FCF","כמו מכפיל רווח, אבל לפי המזומן החופשי. נמוך = זול יותר."],
+ ev:["EV/EBITDA ו-EV/EBIT","אותו רעיון של מכפיל, אבל כולל את החוב — כמו לקנות דירה יחד עם המשכנתא שלה."],
+ peg:["PEG","מכפיל הרווח חלקי קצב הצמיחה. מתחת ל-1 = זול ביחס לכמה שהחברה צומחת."],
+ mos:["Margin of Safety","כמה המחיר נמוך מהשווי שהערכנו. 30% = קונים ב-70 משהו ששווה 100. זו כרית ביטחון למקרה שטעינו בהערכה."],
+ iv:["שווי פנימי","ההערכה שלנו לכמה החברה באמת שווה, לפי הכסף שהיא צפויה לייצר בעתיד. זו הערכה, לא אמת."],
+ dd:["ירידה מהשיא","בכמה אחוז המניה ירדה מהמחיר הגבוה ביותר שלה בשנה האחרונה."],
+ flags:["דגלים","אדום = סיבה רצינית להתרחק. צהוב = משהו שכדאי לבדוק בעצמך."],
+ timing:["תזמון (רמזור)","האם עכשיו זמן טוב להיכנס. ירוק = נראה טוב. צהוב = כדאי לחכות לאישור. אדום = נראית כמו סכין נופלת — עדיין נופלת בלי סימני עצירה."],
+ ma:["ממוצע 50/150/200","המחיר הממוצע של המניה ב-50/150/200 הימים האחרונים — הכיוון הכללי שלה. מעל ממוצע 200 שעולה = מגמה טובה."],
+ rs:["חוזק יחסי","האם המניה התנהגה בחודש האחרון טוב יותר מהשוק כולו ומהענף שלה."],
+ rsi:["RSI","מד עייפות של המניה, 0 עד 100. מתחת ל-30 = המוכרים מותשים. מעל 70 = הקונים מתלהבים. הכי חשוב הכיוון: RSI נמוך שמתחיל לעלות זה סימן טוב."],
+ div:["דייברג'נס שורי","המחיר יורד לשפל חדש, אבל מד ה-RSI כבר לא. כמו מכונית שעדיין מתגלגלת למטה, אבל כבר הורידו את הרגל מהגז."],
+ macd:["MACD","עוד מד של תנופה. כשהוא חוצה למעלה, התנופה מתחילה להשתנות לטובה."],
+ sup:["תמיכה","מחיר שבו המניה נעצרה בעבר, כמו רצפה."],
+ stop:["נקודת ביטול","המחיר שבו אומרים 'טעיתי' ויוצאים. הסורק מציע 2% מתחת לשפל האחרון."],
+ rr:["סיכוי : סיכון","כמה אפשר להרוויח לעומת כמה אפשר להפסיד. 3:1 = על כל שקל שמסכנים, אפשר להרוויח שלושה."],
+ crash:["נפילה חדה","ירידה גדולה ביום אחד, בדרך כלל אחרי דוח או אירוע. כדאי לבדוק מה קרה."],
+ vol:["ציון ווליום","בודק אם המוכרים נחלשים (חיובי) או ממשיכים בכוח (שלילי). מ-10- עד 10+."],
+ rvol:["RVOL","פי כמה המסחר של היום גדול מיום רגיל. 2 = פי שניים מהרגיל."],
+ tx:["עסקאות ביום","כמה פעמים קנו ומכרו את המניה ביום, בממוצע."],
+ ats:["גודל עסקה ממוצע","כמה מניות בכל עסקה. אם זה גדל פתאום, אולי גופים גדולים נכנסים."],
+ tech:["מצב טכני","תמונה כללית של הגרף: עדיין בירידה, מתייצבת, או מתחילה להתאושש."],
+ btm:["תצורת תחתית","סימנים שהירידה נגמרת: תחתית כפולה (נגעה פעמיים באותה רצפה), שפלים עולים, או חזרה מעל ממוצע 200."],
+ pat:["תבניות","צורות בגרף שלפעמים באות לפני עלייה. 'פרצה' = עברה את התקרה שלה. 'קרובה' = עד 5% מתחת לתקרה."],
+ cup:["ספל וידית","המניה ירדה, עלתה בחזרה בצורת U, ירדה קצת (הידית), ועכשיו מוכנה לפרוץ."],
+ flat:["בסיס שטוח","אחרי עלייה, המניה 'נחה' זמן מה בטווח מחירים צר."],
+ flag:["דגל שורי","עלייה חדה, ואחריה ירידה קטנה ושקטה — כמו דגל על תורן."],
+ tri:["משולש עולה","תקרה קבועה ורצפות שעולות כל פעם, עד שהמניה נלחצת למעלה."],
+ hi52:["שיא 52 שבועות","המניה במחיר הגבוה ביותר שלה בשנה האחרונה."],
+ golden:["Golden Cross","ממוצע 50 עבר מעל ממוצע 200 — סימן שהמגמה הכללית הפכה לחיובית."],
+ ma150:["מרחק מממוצע 150","כמה המחיר רחוק מהממוצע. קרוב (עד 10%) = כניסה פחות מסוכנת. רחוק מאוד = המניה 'מתוחה'."],
+ journal:["יומן ביצועים","כל תחילת חודש הסורק מצלם את המניות הטובות ואת המחיר שלהן. ככה רואים אחר כך אם הן באמת עלו יותר מהשוק."]
+};
+const qm=k=>GL[k]?`<button type="button" class="qm" data-k="${k}" aria-label="מה זה ${GL[k][0]}?">?</button>`:"";
+const CHK_KEY=[["צמיחת הכנסות","rev"],["EPS","eps"],["FCF","fcf"],["ROIC","roic"],["Gross","gm"],["Operating","om"],["Net Debt","nd"],["Interest","ic"],["דילול","dil"],
+ ["P/E","pe"],["P/FCF","pfcf"],["EV/","ev"],["PEG","peg"],["Margin of Safety","mos"],["מדדים מצביעים","pe"],["ירידה מהשיא","dd"],["ההכנסות","rev"],["קפיצה בחוב","nd"],
+ ["ממוצע","ma"],["S&P","rs"],["סקטור","rs"],["ווליום","vol"],["שבירת תמיכה","sup"],["נפילה","crash"],["RSI","rsi"],["דייברג","div"],["MACD","macd"],["תמיכה","sup"],["סיכוי","rr"]];
+const chkKey=l=>{const m=CHK_KEY.find(([s])=>l.includes(s));return m?m[1]:null};
 const COLS = [
-  {k:"rank", l:"#", sort:null},
+  {k:"rank", l:"#", sort:null, hm:1},
   {k:"t", l:"מניה", sort:s=>s.t},
   {k:"score", l:"ציון", sort:s=>s.score},
   {k:"dd52", l:"ירידה מהשיא", sort:s=>s.dd52},
@@ -387,7 +460,8 @@ function renderTiers(){
 }
 
 function renderHead(){
-  $("thead").innerHTML = COLS.map((c,i)=>`<th data-i="${i}" ${c.k===st.key?`aria-sort="${st.dir<0?"descending":"ascending"}"`:""}>${c.l}</th>`).join("");
+  const HK={score:"score",dd52:"dd",mos:"mos",pfcf:"pfcf",pe:"pe",roic:"roic",rev_g:"rev",timing:"timing",vol:"vol",tx:"tx",tech:"tech",btm:"btm",flags:"flags"};
+  $("thead").innerHTML = COLS.map((c,i)=>`<th data-i="${i}" ${c.k===st.key?`aria-sort="${st.dir<0?"descending":"ascending"}"`:""}>${c.l}${qm(HK[c.k])}</th>`).join("");
   $("thead").querySelectorAll("th").forEach(th=>th.onclick=()=>{
     const c=COLS[+th.dataset.i]; if(!c.sort) return;
     if(st.key===c.k) st.dir*=-1; else {st.key=c.k; st.dir=(c.k==="pfcf"||c.k==="pe"||c.k==="flags")?1:-1;}
@@ -413,21 +487,21 @@ function renderRows(){
   $("empty").hidden = view.length>0;
   if(!view.length) $("empty").textContent="אין מניות שמתאימות לסינון. נסה להרחיב אחד המסננים.";
   $("rows").innerHTML = view.slice(0,shown).map((s,i)=>`<tr data-t="${esc(s.t)}" tabindex="0">
-    <td class="mut num">${i+1}</td>
-    <td><span class="dot ${s.tier}"></span><span class="tk ltr">${esc(s.t)}</span>${s.new?'<span class="new">חדש</span>':""}<span class="nm">${esc(s.name)}</span></td>
-    <td><div class="score"><b class="num">${s.score.toFixed(0)}</b>${bar(s)}</div></td>
-    <td>${pct(s.dd52)}</td>
-    <td class="${s.mos>0?"pos":"neg"}">${pct(s.mos)}</td>
-    <td>${n1(s.pfcf)}</td>
-    <td>${n1(s.pe)}</td>
-    <td>${s.roic!=null&&s.roic>1?'מעל 100%':pct(s.roic)}</td>
-    <td>${pct(s.rev_g,1)}</td>
-    <td>${s.timing?`${LIGHT[s.timing.light]} <span class="num">${s.timing.score==null?"—":s.timing.score.toFixed(0)}</span>`:'<span class="mut">—</span>'}</td>
-    <td>${volCell(s.vol)}</td>
-    <td class="num ltr">${s.vol&&s.vol.tx?fmtN(s.vol.tx.n20):'<span class="mut">—</span>'}</td>
-    <td class="tech">${TECH[s.tech.state]}</td>
-    <td>${(s.bottom||[]).map(b=>`<span class="badge btm">${esc(b.n)}</span>`).join("")||'<span class="mut">—</span>'}</td>
-    <td class="flags">${s.red.length?`<span class="r">${s.red.length} אדומים</span> `:""}${s.yellow.length?`<span class="y">${s.yellow.length} צהובים</span>`:""}${!s.red.length&&!s.yellow.length?'<span class="mut">נקי</span>':""}</td>
+    <td class="mut num hide-m">${i+1}</td>
+    <td class="lead"><span class="dot ${s.tier}"></span><span class="tk ltr">${esc(s.t)}</span>${s.new?'<span class="new">חדש</span>':""}<span class="nm">${esc(s.name)}</span></td>
+    <td data-label="ציון"><div class="score"><b class="num">${s.score.toFixed(0)}</b>${bar(s)}</div></td>
+    <td data-label="ירידה מהשיא">${pct(s.dd52)}</td>
+    <td data-label="Margin of Safety" class="${s.mos>0?"pos":"neg"}">${pct(s.mos)}</td>
+    <td data-label="P/FCF">${n1(s.pfcf)}</td>
+    <td data-label="P/E">${n1(s.pe)}</td>
+    <td data-label="ROIC">${s.roic!=null&&s.roic>1?'מעל 100%':pct(s.roic)}</td>
+    <td data-label="צמיחת הכנסות">${pct(s.rev_g,1)}</td>
+    <td data-label="תזמון">${s.timing?`<span>${LIGHT[s.timing.light]} <span class="num">${s.timing.score==null?"—":s.timing.score.toFixed(0)}</span></span>`:'<span class="mut">—</span>'}</td>
+    <td data-label="ווליום">${volCell(s.vol)}</td>
+    <td data-label="עסקאות ביום" class="num">${s.vol&&s.vol.tx?`<span class="ltr">${fmtN(s.vol.tx.n20)}</span>`:'<span class="mut">—</span>'}</td>
+    <td data-label="מצב טכני" class="tech">${TECH[s.tech.state]}</td>
+    <td data-label="תצורת תחתית">${(s.bottom||[]).map(b=>`<span class="badge btm">${esc(b.n)}</span>`).join("")||'<span class="mut">—</span>'}</td>
+    <td data-label="דגלים" class="flags">${s.red.length?`<span class="r">${s.red.length} אדומים</span> `:""}${s.yellow.length?`<span class="y">${s.yellow.length} צהובים</span>`:""}${!s.red.length&&!s.yellow.length?'<span class="mut">נקי</span>':""}</td>
   </tr>`).join("");
   $("more").hidden = view.length<=shown;
   $("rows").querySelectorAll("tr").forEach(tr=>{
@@ -449,10 +523,11 @@ function spark(label, vals, fmt){
 }
 
 function checks(title, list, score, color){
+  const qk=l=>{const k=chkKey(l);return k?qm(k):""};
   const ic={1:["✓","s1"],0.5:["½","s05"],0:["✗","s0"]};
   return `<section class="blk"><h3><span style="color:${color}">${title}</span><small class="num">${score==null?"—":score.toFixed(0)+"/100"}</small></h3>
   <table class="chk">${list.map(c=>{const [a,cl]=c.s==null?["–","sn"]:ic[c.s];
-    return `<tr><td class="${cl}">${a}</td><td>${esc(c.l)}</td><td><bdi class="num">${esc(c.v)}</bdi></td></tr>`}).join("")}</table></section>`;
+    return `<tr><td class="${cl}">${a}</td><td>${esc(c.l)}${qk(c.l)}</td><td><bdi class="num">${esc(c.v)}</bdi></td></tr>`}).join("")}</table></section>`;
 }
 
 const txOk=(V,txv,avv)=>(txv===""||(V&&V.tx&&V.tx.n20>=+txv)) && (avv===""||(V&&V.av20>=+avv));
@@ -464,9 +539,9 @@ function volCell(V){
 }
 function volBlock(V){
   if(!V) return "";
-  return `<section class="blk"><h3><span>ווליום — האם לחץ המכירה נחלש?</span><small class="num ltr">${V.score>0?"+":""}${V.score} / 10</small></h3>
-    <div class="kv" style="margin:0 0 6px"><b>${esc(V.cls)}</b><span>RVOL 20: <b class="ltr num">${V.rv20}×</b></span><span>RVOL 50: <b class="ltr num">${V.rv50}×</b></span><span>ווליום יומי: <b class="ltr num">${fmtN(V.av20)}</b></span></div>
-    ${V.tx?`<div class="kv" style="margin:0 0 6px"><span>עסקאות ביום: <b class="ltr num">${fmtN(V.tx.n20)}</b></span><span>גודל עסקה ממוצע: <b class="ltr num">${Math.round(V.tx.ats).toLocaleString("en-US")}</b> מניות</span>${V.tx.ats_chg!=null?`<span>שינוי בגודל העסקה: <b class="ltr num ${V.tx.ats_chg>0?"pos":"neg"}">${(V.tx.ats_chg>0?"+":"")+(V.tx.ats_chg*100).toFixed(0)}%</b></span>`:""}</div>`:""}
+  return `<section class="blk"><h3><span>ווליום — האם לחץ המכירה נחלש?${qm("vol")}</span><small class="num ltr">${V.score>0?"+":""}${V.score} / 10</small></h3>
+    <div class="kv" style="margin:0 0 6px"><b>${esc(V.cls)}</b><span>RVOL${qm("rvol")} 20: <b class="ltr num">${V.rv20}×</b></span><span>RVOL 50: <b class="ltr num">${V.rv50}×</b></span><span>ווליום יומי: <b class="ltr num">${fmtN(V.av20)}</b></span></div>
+    ${V.tx?`<div class="kv" style="margin:0 0 6px"><span>עסקאות ביום: <b class="ltr num">${fmtN(V.tx.n20)}</b></span><span>גודל עסקה ממוצע${qm("ats")}: <b class="ltr num">${Math.round(V.tx.ats).toLocaleString("en-US")}</b> מניות</span>${V.tx.ats_chg!=null?`<span>שינוי בגודל העסקה: <b class="ltr num ${V.tx.ats_chg>0?"pos":"neg"}">${(V.tx.ats_chg>0?"+":"")+(V.tx.ats_chg*100).toFixed(0)}%</b></span>`:""}</div>`:""}
     ${V.notes.length?`<ul class="manual" style="margin:4px 0 0;padding-inline-start:18px">${V.notes.map(n=>`<li>${esc(n)}</li>`).join("")}</ul>`:'<p class="mut" style="font-size:13px;margin:4px 0 0">לא נמצאו סימני ווליום מובהקים לכאן או לכאן.</p>'}
   </section>`;
 }
@@ -474,17 +549,17 @@ function timingBlock(T){
   const p=T.plan||{}, f=(x,d=1)=>x==null?"—":(x*100).toFixed(d)+"%", $$=x=>x==null?"—":"$"+Number(x).toLocaleString("en-US");
   const extra=[T.div&&T.div.includes("bull")?"דייברג'נס שורי":null, T.div&&T.div.includes("bear")?"דייברג'נס דובי":null,
     T.macd&&T.macd.cross?"חציית MACD לאחרונה":null].filter(Boolean);
-  return `<section class="blk"><h3><span style="color:var(--ink)">תזמון וסיכון ${LIGHT[T.light]}</span><small class="num">${T.score==null?"—":T.score.toFixed(0)+"/100"}</small></h3>
+  return `<section class="blk"><h3><span style="color:var(--ink)">תזמון וסיכון ${LIGHT[T.light]}${qm("timing")}</span><small class="num">${T.score==null?"—":T.score.toFixed(0)+"/100"}</small></h3>
     <div class="kv" style="margin:0 0 6px"><b>${LIGHTN[T.light]}</b></div>
     <div class="kv" style="margin:0 0 8px"><span>RSI יומי <b>${esc(T.rsi.n)}</b></span><span>RSI שבועי <b class="ltr num">${T.wrsi??"—"}</b></span>${extra.map(x=>`<span class="badge">${x}</span>`).join("")}</div>
     <div class="stats" style="margin-bottom:10px">
-      <div class="stat"><span>תמיכה קרובה</span><b class="ltr num" style="font-size:16px">${$$(p.support)}</b></div>
-      <div class="stat"><span>נקודת ביטול מוצעת</span><b class="ltr num" style="font-size:16px">${$$(p.stop)}</b><span>סיכון ${f(p.risk)}</span></div>
-      <div class="stat"><span>יעד (שווי פנימי)</span><b class="ltr num" style="font-size:16px">${$$(p.target)}</b><span>פוטנציאל ${f(p.reward,0)}</span></div>
-      <div class="stat"><span>סיכוי : סיכון</span><b class="num" style="font-size:16px">${p.rr==null?"—":p.rr>10?"מעל 10 : 1":p.rr.toFixed(1)+" : 1"}</b></div>
+      <div class="stat"><span>תמיכה קרובה${qm("sup")}</span><b class="ltr num" style="font-size:16px">${$$(p.support)}</b></div>
+      <div class="stat"><span>נקודת ביטול מוצעת${qm("stop")}</span><b class="ltr num" style="font-size:16px">${$$(p.stop)}</b><span>סיכון ${f(p.risk)}</span></div>
+      <div class="stat"><span>יעד (שווי פנימי)${qm("iv")}</span><b class="ltr num" style="font-size:16px">${$$(p.target)}</b><span>פוטנציאל ${f(p.reward,0)}</span></div>
+      <div class="stat"><span>סיכוי : סיכון${qm("rr")}</span><b class="num" style="font-size:16px">${p.rr==null?"—":p.rr>10?"מעל 10 : 1":p.rr.toFixed(1)+" : 1"}</b></div>
     </div>
     <table class="chk">${T.checks.map(c=>{const ic={1:["✓","s1"],0.5:["½","s05"],0:["✗","s0"]};const [a,cl]=c.s==null?["–","sn"]:ic[c.s];
-      return `<tr><td class="${cl}">${a}</td><td>${esc(c.l)}</td><td><bdi class="num">${esc(c.v)}</bdi></td></tr>`}).join("")}</table>
+      const k=chkKey(c.l); return `<tr><td class="${cl}">${a}</td><td>${esc(c.l)}${k?qm(k):""}</td><td><bdi class="num">${esc(c.v)}</bdi></td></tr>`}).join("")}</table>
     <p class="mut" style="font-size:12.5px;margin:8px 0 0">נקודת הביטול: 2% מתחת לשפל האחרון. זו הצעה בלבד — ההחלטה וגודל הפוזיציה שלך.</p>
   </section>`;
 }
@@ -502,7 +577,7 @@ function openDrawer(t){
       <span>דוחות עד <b class="ltr num">${esc(s.data_to)}</b></span>
     </div>
     <div class="score big"><b class="num" style="font-size:30px">${s.score.toFixed(0)}</b>${bar(s)}</div>
-    <div class="legend"><span style="--c:var(--q)">איכות ${s.q??"—"}</span><span style="--c:var(--v)">תמחור ${s.v??"—"}</span><span style="--c:var(--d)">ירידה ${s.d??"—"}</span></div>
+    <div class="legend">${qm("score")}<span style="--c:var(--q)">איכות ${s.q??"—"}</span><span style="--c:var(--v)">תמחור ${s.v??"—"}</span><span style="--c:var(--d)">ירידה ${s.d??"—"}</span></div>
     <div class="kv" style="margin-top:12px">
       <span>מצב טכני <b>${TECH[s.tech.state]}</b></span>
       <span>RSI <b class="ltr num">${s.tech.rsi??"—"}</b></span>
@@ -541,6 +616,25 @@ function openDrawer(t){
 }
 function closeDrawer(){ $("drawer").classList.remove("open"); $("scrim").classList.remove("open"); $("drawer").setAttribute("aria-hidden","true"); }
 $("scrim").onclick=closeDrawer;
+document.body.insertAdjacentHTML("beforeend",'<div id="tip" role="tooltip" hidden></div>');
+document.addEventListener("click",e=>{
+  const b=e.target.closest(".qm"), tip=$("tip");
+  if(!b){ tip.hidden=true; return; }
+  e.stopPropagation(); e.preventDefault();
+  const [t,x]=GL[b.dataset.k]; tip.innerHTML=`<b>${esc(t)}</b>${esc(x)}`; tip.hidden=false;
+  const r=b.getBoundingClientRect(), w=Math.min(300,innerWidth-20);
+  tip.style.width=w+"px";
+  let left=Math.min(Math.max(10,r.left+r.width/2-w/2),innerWidth-w-10);
+  tip.style.left=left+"px";
+  const below=r.bottom+8, h=tip.offsetHeight;
+  tip.style.top=(below+h>innerHeight-10? Math.max(10,r.top-h-8):below)+"px";
+},true);
+document.addEventListener("keydown",e=>{if(e.key==="Escape")$("tip").hidden=true});
+document.querySelectorAll(".filtbtn").forEach(b=>b.onclick=()=>{
+  const f=document.querySelector(`.filt[data-v="${b.dataset.for}"]`), open=!f.classList.contains("open");
+  f.classList.toggle("open",open); b.setAttribute("aria-expanded",open); b.textContent=open?"סגירת המסננים ▴":"חיפוש ומסננים ▾";
+});
+addEventListener("scroll",()=>{$("tip").hidden=true},true);
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeDrawer()});
 ["q","sector","tech","dd","capf","tmf","vf","dtx","dav","onlynew","nored","onlybtm"].forEach(id=>$(id).addEventListener("input",()=>{shown=100;apply()}));
 $("more").onclick=()=>{shown+=100;renderRows()};
@@ -561,8 +655,8 @@ const PNAMES={cup:"ספל וידית",flat:"בסיס שטוח",flag:"דגל שו
 function renderPatChips(){
   const cnt={}; PATS.forEach(p=>p.pats.forEach(x=>cnt[x.k]=(cnt[x.k]||0)+1));
   $("patchips").innerHTML = `<button class="chip" data-k="" aria-pressed="${pk===""}">הכל (${PATS.length})</button>` +
-    Object.entries(PNAMES).map(([k,n])=>`<button class="chip" data-k="${k}" aria-pressed="${pk===k}">${n} (${cnt[k]||0})</button>`).join("");
-  $("patchips").querySelectorAll("button").forEach(b=>b.onclick=()=>{pk=b.dataset.k;renderPatChips();applyPat()});
+    Object.entries(PNAMES).map(([k,n])=>`<span style="display:inline-flex;align-items:center"><button class="chip" data-k="${k}" aria-pressed="${pk===k}">${n} (${cnt[k]||0})</button>${qm(k)}</span>`).join("");
+  $("patchips").querySelectorAll("button.chip").forEach(b=>b.onclick=()=>{pk=b.dataset.k;renderPatChips();applyPat()});
 }
 function mini(p){
   const c=p.chart, piv=Math.max(...p.pats.map(x=>x.pivot).filter(x=>x)), ml=(p.ma150_line||[]).filter(x=>x!=null);
@@ -590,16 +684,16 @@ function applyPat(){
   $("prows").innerHTML=v.slice(0,300).map(p=>{
     const xs=p.pats.filter(x=>!pk||x.k===pk), main=xs[0];
     return `<tr data-t="${esc(p.t)}" tabindex="0">
-      <td><span class="tk ltr">${esc(p.type==="coin"?p.t.replace("-USD",""):p.t)}</span>${p.type==="intl"?`<span class="badge">${esc(p.exn)}</span>`:(TYPEB[p.type]||"")}<span class="nm">${p.type==="intl"?`מחיר: <span class="ltr num">${p.price}</span> ${esc(p.ccy)}`:esc(p.name)}</span></td>
-      <td>${p.pats.map(x=>`<span class="badge ${x.st==="breakout"?"bo":""}">${esc(x.n)}${x.st==="breakout"?" · פרצה":" · קרובה"}</span>`).join("<br>")}</td>
-      <td class="${main.dist>=0?"pos":""}">${pct(main.dist,1)}</td>
-      <td>${p.vr==null?'<span class="mut">—</span>':`<span class="ltr num ${p.vr>=1.5?"pos":""}">${p.vr.toFixed(1)}×</span>`}</td>
-      <td>${volCell(p.vol)}</td>
-      <td class="num ltr">${p.vol&&p.vol.tx?fmtN(p.vol.tx.n20):'<span class="mut">—</span>'}</td>
-      <td>${p.ma150==null?'<span class="mut">—</span>':`<span class="ltr num ${Math.abs(p.ma150)<=0.10?"pos":p.ma150>0.25?"neg":""}">${(p.ma150>=0?"+":"")+(p.ma150*100).toFixed(1)}%</span> <span class="mut" title="כיוון הממוצע">${p.ma150_up?"↗":"↘"}</span>`}</td>
-      <td>${p.rsi&&p.rsi.rsi!=null?`<span class="${p.rsi.s===1?"pos":p.rsi.s===0?"neg":""}">${esc(p.rsi.n)}</span> <span class="mut ltr num">${p.rsi.rsi}</span>`:'<span class="mut">—</span>'}</td>
-      <td>${mini(p)}</td>
-      <td>${p.score==null?'<span class="mut">—</span>':`<span class="dot ${p.tier}"></span><span class="num">${p.score.toFixed(0)}</span>`}</td>
+      <td class="lead"><span class="tk ltr">${esc(p.type==="coin"?p.t.replace("-USD",""):p.t)}</span>${p.type==="intl"?`<span class="badge">${esc(p.exn)}</span>`:(TYPEB[p.type]||"")}<span class="nm">${p.type==="intl"?`מחיר: <span class="ltr num">${p.price}</span> ${esc(p.ccy)}`:esc(p.name)}</span></td>
+      <td data-label="תבניות">${p.pats.map(x=>`<span class="badge ${x.st==="breakout"?"bo":""}">${esc(x.n)}${x.st==="breakout"?" · פרצה":" · קרובה"}</span>`).join("<br>")}</td>
+      <td data-label="מרחק מהפריצה" class="${main.dist>=0?"pos":""}">${pct(main.dist,1)}</td>
+      <td data-label="ווליום יחסי">${p.vr==null?'<span class="mut">—</span>':`<span class="ltr num ${p.vr>=1.5?"pos":""}">${p.vr.toFixed(1)}×</span>`}</td>
+      <td data-label="ציון ווליום">${volCell(p.vol)}</td>
+      <td data-label="עסקאות ביום" class="num">${p.vol&&p.vol.tx?`<span class="ltr">${fmtN(p.vol.tx.n20)}</span>`:'<span class="mut">—</span>'}</td>
+      <td data-label="מרחק מממוצע 150">${p.ma150==null?'<span class="mut">—</span>':`<span class="ltr num ${Math.abs(p.ma150)<=0.10?"pos":p.ma150>0.25?"neg":""}">${(p.ma150>=0?"+":"")+(p.ma150*100).toFixed(1)}%</span> <span class="mut" title="כיוון הממוצע">${p.ma150_up?"↗":"↘"}</span>`}</td>
+      <td data-label="RSI">${p.rsi&&p.rsi.rsi!=null?`<span class="${p.rsi.s===1?"pos":p.rsi.s===0?"neg":""}">${esc(p.rsi.n)}</span> <span class="mut ltr num">${p.rsi.rsi}</span>`:'<span class="mut">—</span>'}</td>
+      <td data-label="גרף">${mini(p)}</td>
+      <td data-label="ציון Dip">${p.score==null?'<span class="mut">—</span>':`<span class="dot ${p.tier}"></span><span class="num">${p.score.toFixed(0)}</span>`}</td>
     </tr>`}).join("");
   $("prows").querySelectorAll("tr").forEach(tr=>{
     const go=()=>{ if(ALL.find(s=>s.t===tr.dataset.t)) openDrawer(tr.dataset.t); else window.open("https://finance.yahoo.com/quote/"+encodeURIComponent(tr.dataset.t),"_blank","noopener"); };
