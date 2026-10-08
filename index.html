@@ -121,6 +121,7 @@ section.blk h3 small{color:var(--muted);font-weight:500}
 .links{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
 .links a{color:var(--blue);text-decoration:none;border:1px solid var(--line);border-radius:6px;padding:5px 10px;font-size:13px}
 .filtbtn{display:none;max-width:1280px;margin:12px 20px 0;padding:9px 14px;border:1px solid var(--line);border-radius:8px;background:var(--panel);font-weight:600;cursor:pointer}
+@media (max-width:700px){ .tabs{padding:0 8px} .tabs button{padding:10px 9px;font-size:14px} }
 @media (max-width:700px){ .filtbtn{display:block;width:calc(100% - 40px)} .filt{display:none!important} .filt.open{display:flex!important} }
 .tabs{max-width:1280px;margin:4px auto 0;padding:0 20px;display:flex;gap:4px;border-bottom:1px solid var(--line);overflow-x:auto}
 .tabs button{border:0;background:none;padding:10px 14px;font-weight:600;color:var(--muted);border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap}
@@ -186,6 +187,7 @@ footer{max-width:1280px;margin:0 auto 30px;padding:0 20px;color:var(--muted);fon
 <nav class="tabs" role="tablist" aria-label="לשוניות">
   <button role="tab" data-v="dip" aria-selected="true">Buy the Dip</button>
   <button role="tab" data-v="pat" aria-selected="false">תבניות טכניות</button>
+  <button role="tab" data-v="hy" aria-selected="false">🔥 הייפ</button>
   <button role="tab" data-v="jr" aria-selected="false">יומן ביצועים</button>
 </nav>
 
@@ -221,6 +223,14 @@ footer{max-width:1280px;margin:0 auto 30px;padding:0 20px;color:var(--muted);fon
     <option value="amber">🟡 אור צהוב</option>
     <option value="red">🔴 אור אדום</option>
   </select>
+<select id="dwy" aria-label="וויקוף">
+      <option value="">כל מצבי וויקוף</option>
+      <option value="strong">וויקוף: איסוף / ניעור מאושר / פריצה</option>
+      <option value="bull">וויקוף: כל סימן חיובי (כולל אפשרי)</option>
+      <option value="spring">וויקוף: ניעור (אפשרי או מאושר)</option>
+      <option value="DISTRIBUTION">וויקוף: פיזור אפשרי</option>
+      <option value="MARKDOWN">וויקוף: המשך ירידה</option>
+    </select>
   <select id="vf" aria-label="ציון ווליום">
       <option value="">כל ציוני הווליום</option>
       <option value="7">ווליום: אישור חזק (7+)</option>
@@ -307,6 +317,14 @@ footer{max-width:1280px;margin:0 auto 30px;padding:0 20px;color:var(--muted);fon
       <option value="breakout">רק כאלה שפרצו</option>
       <option value="near">רק קרובות לפריצה</option>
     </select>
+<select id="pwy" aria-label="וויקוף">
+      <option value="">כל מצבי וויקוף</option>
+      <option value="strong">וויקוף: איסוף / ניעור מאושר / פריצה</option>
+      <option value="bull">וויקוף: כל סימן חיובי (כולל אפשרי)</option>
+      <option value="spring">וויקוף: ניעור (אפשרי או מאושר)</option>
+      <option value="DISTRIBUTION">וויקוף: פיזור אפשרי</option>
+      <option value="MARKDOWN">וויקוף: המשך ירידה</option>
+    </select>
     <select id="pvf" aria-label="ציון ווליום">
       <option value="">כל ציוני הווליום</option>
       <option value="7">ווליום: אישור חזק (7+)</option>
@@ -361,6 +379,35 @@ footer{max-width:1280px;margin:0 auto 30px;padding:0 20px;color:var(--muted);fon
   </div>
 </div>
 
+<div id="view-hy" hidden>
+  <p class="note"><button type="button" class="qm" data-k="hype" aria-label="מה זה הייפ?">?</button> המניות שהכי מדברים עליהן עכשיו — לפי אזכורים ברדיט ולפי קפיצות חריגות במסחר. לשונית עצמאית: לא קשורה לציון, לרמות או לתבניות. הייפ זה לא המלצה — לפעמים הוא דווקא סימן לסכנה.</p>
+  <button class="filtbtn" data-for="hy" aria-expanded="false">חיפוש ומסננים ▾</button>
+  <div class="tools filt" data-v="hy">
+    <input type="search" id="hq" placeholder="חיפוש לפי שם או סימול" aria-label="חיפוש הייפ">
+    <select id="hsrc" aria-label="מקור">
+      <option value="">כל המקורות</option>
+      <option value="reddit">רק אזכורים ברדיט</option>
+      <option value="volume">רק קפיצה במסחר</option>
+      <option value="both">גם וגם</option>
+    </select>
+    <select id="hmin" aria-label="מינימום אזכורים">
+      <option value="0">כל כמות אזכורים</option>
+      <option value="10">10 אזכורים ומעלה</option>
+      <option value="50">50 אזכורים ומעלה</option>
+      <option value="200">200 אזכורים ומעלה</option>
+    </select>
+    <label class="toggle"><input type="checkbox" id="hnew"> רק 🔥 הייפ חדש</label>
+    <span class="count" id="hcount"></span>
+  </div>
+  <div class="wrap">
+    <div class="msort"><select id="hsortk" aria-label="מיין לפי"></select><button id="hsortd" type="button" aria-label="הפוך כיוון">▼</button></div>
+    <div class="tablebox cardtable"><table>
+      <thead><tr id="hthead"></tr></thead>
+      <tbody id="hrows"></tbody>
+    </table><div class="empty" id="hempty" hidden>אין מניות שמתאימות לסינון.</div></div>
+  </div>
+</div>
+
 <div id="view-jr" hidden>
   <p class="note"><button type="button" class="qm" data-k="journal" aria-label="מה זה יומן ביצועים?">?</button> בתחילת כל חודש הסורק שומר "צילום" של המניות הירוקות, הצהובות ושל מניות התבניות, עם המחיר שלהן באותו יום. כאן רואים מה קרה איתן מאז, לעומת S&amp;P 500.</p>
   <div class="wrap"><div class="cards" id="jcards"></div></div>
@@ -385,7 +432,7 @@ const TIERS = {
 const TECH = {down:"🔻 בירידה", flat:"➖ מתייצבת", up:"🔼 מתאוששת"};
 const LIGHT = {green:"🟢", amber:"🟡", red:"🔴"};
 const LIGHTN = {green:"אור ירוק — התזמון תומך", amber:"אור צהוב — לחכות לאישור", red:"אור אדום — נראית כמו סכין נופלת"};
-const VERSION = "1.9.3";
+const VERSION = "2.0";
 const GL={
  score:["ציון","תעודה למניה מ-0 עד 100. ככל שגבוה יותר, החברה טובה יותר והמחיר שלה זול יותר."],
  tiers:["רמות","ירוקה = חברה טובה במחיר טוב. צהובה = חסר לה דבר אחד או שניים. מעקב = חברה טובה שעוד לא ירדה מספיק."],
@@ -432,11 +479,20 @@ const GL={
  ma150:["מרחק מממוצע 150","כמה המחיר רחוק מהממוצע. קרוב (עד 10%) = כניסה פחות מסוכנת. רחוק מאוד = המניה 'מתוחה'."],
  atr:["תנודה יומית","בכמה אחוז המניה זזה ביום רגיל, בממוצע. 1% = רגועה, 4% ומעלה = קופצנית. ככל שגבוה יותר, צריך יותר מקום לנקודת הביטול."],
  beta:["בטא","כמה המניה מגזימה ביחס לשוק. 1 = זזה כמו השוק. 2 = כשהשוק יורד 10%, היא יורדת בערך 20%. מתחת ל-1 = רגועה מהשוק."],
+ wy:["וויקוף","שיטה ישנה לקריאת גרף. היא מחפשת את 'הסיפור' של מניה שירדה: פאניקה של מוכרים, ואז מנוחה בטווח צר, לפעמים 'ניעור' שמפחיד אנשים, ובסוף פריצה למעלה. הסורק רק מזהה התנהגות שמתאימה לסיפור — הוא לא יודע מה באמת קורה."],
+ wyst:["מצב וויקוף","איסוף = המניה נחה אחרי ירידה ונראה שקונים נכנסים. ניעור = ירידה רגעית מתחת לרצפה וחזרה מהירה. פריצה = יצאה מהטווח למעלה. פיזור = אחרי עלייה, נראה שמוכרים. המשך ירידה = המבנה נשבר."],
+ spring:["ניעור (Spring)","המניה יורדת לרגע מתחת לרצפה, מפחידה אנשים למכור, ואז חוזרת מהר למעלה. אחד הסימנים המוכרים לסוף ירידה — אבל רק אחרי אישור."],
+ hype:["הייפ","כמה מדברים על המניה עכשיו. נמדד בשתי דרכים: אזכורים בקהילות המסחר ברדיט, וקפיצה חריגה במסחר ובמספר העסקאות. הייפ זה לא סימן לקנות — לפעמים זה דווקא סימן לסכנה."],
+ ment:["אזכורים ברדיט","כמה פעמים המניה הוזכרה ב-24 השעות האחרונות בקהילות המסחר הגדולות ברדיט, כמו WallStreetBets. יש שם גם בוטים, אז זה לא מדויק לגמרי."],
+ mchg:["שינוי מאתמול","כמה השתנו האזכורים לעומת היממה הקודמת. +200% = פי 3 יותר דיבור מאתמול."],
+ rkup:["עלייה בדירוג","בכמה מקומות המניה טיפסה ברשימת המניות הכי מדוברות לעומת אתמול."],
+ txj:["קפיצה בעסקאות","פי כמה מספר העסקאות של היום גדול מהממוצע. 3 = פי שלושה מיום רגיל."],
+ newhype:["הייפ חדש","המניה פתאום בשיחה: האזכורים קפצו פי 3 ומעלה מאתמול, או שהמסחר היום פי 5 מהרגיל."],
  journal:["יומן ביצועים","כל תחילת חודש הסורק מצלם את המניות הטובות ואת המחיר שלהן. ככה רואים אחר כך אם הן באמת עלו יותר מהשוק."]
 };
 const ML={"ציון":"score","ירידה מהשיא":"dd","Margin of Safety":"mos","P/FCF":"pfcf","P/E":"pe","ROIC":"roic","צמיחת הכנסות":"rev","תזמון":"timing",
  "ווליום":"vol","עסקאות ביום":"tx","מצב טכני":"tech","תצורת תחתית":"btm","דגלים":"flags","תבניות":"pat","מרחק מהפריצה":"pat","ווליום יחסי":"rvol",
- "ציון ווליום":"vol","מרחק מממוצע 150":"ma150","RSI":"rsi","ציון Dip":"score","תנודה יומית":"atr","בטא":"beta"};
+ "ציון ווליום":"vol","מרחק מממוצע 150":"ma150","RSI":"rsi","ציון Dip":"score","תנודה יומית":"atr","בטא":"beta","וויקוף":"wy","אזכורים ברדיט":"ment","שינוי מאתמול":"mchg","עלייה בדירוג":"rkup","ווליום חריג":"rvol","קפיצה בעסקאות":"txj"};
 const addML=html=>html.replace(/<td data-label="([^"]+)"([^>]*)>/g,(m,l,rest)=>`<td data-label="${l}"${rest}><span class="ml">${l}${ML[l]?qm(ML[l]):""}</span>`);
 const qm=k=>GL[k]?`<button type="button" class="qm" data-k="${k}" aria-label="מה זה ${GL[k][0]}?">?</button>`:"";
 const CHK_KEY=[["צמיחת הכנסות","rev"],["EPS","eps"],["FCF","fcf"],["ROIC","roic"],["Gross","gm"],["Operating","om"],["Net Debt","nd"],["Interest","ic"],["דילול","dil"],
@@ -458,6 +514,7 @@ const COLS = [
   {k:"tx", l:"עסקאות/יום", sort:s=>s.vol&&s.vol.tx?s.vol.tx.n20:null},
   {k:"atr", l:"תנודה יומית", sort:s=>s.risk?s.risk.atr:null},
   {k:"beta", l:"בטא", sort:s=>s.risk?s.risk.beta:null},
+  {k:"wy", l:"וויקוף", sort:s=>s.wy?s.wy.score:null},
   {k:"tech", l:"מצב טכני", sort:s=>({down:0,flat:1,up:2})[s.tech.state]},
   {k:"btm", l:"תצורת תחתית", sort:s=>(s.bottom||[]).length},
   {k:"flags", l:"דגלים", sort:s=>s.red.length*10+s.yellow.length},
@@ -486,6 +543,11 @@ async function load(){
     const secs=[...new Set(ALL.map(s=>s.sector).filter(Boolean))].sort();
     $("sector").insertAdjacentHTML("beforeend", secs.map(s=>`<option>${esc(s)}</option>`).join(""));
     PATS = data.patterns||[];
+    HYPE = data.hype||[];
+    $("hsortk").innerHTML=`<option value="">מיין לפי: ברירת מחדל</option>`+HCOLS.map(c=>`<option value="${c.k}">מיין לפי: ${c.l}</option>`).join("");
+    $("hsortk").onchange=()=>{hs.key=$("hsortk").value||null; renderHHead(); applyHype();};
+    $("hsortd").onclick=()=>{hs.dir*=-1; renderHHead(); applyHype();};
+    renderHHead(); applyHype();
     $("ver").textContent = `גרסת מסך ${VERSION} · גרסת סורק ${data.version||"ישנה"}`;
     $("dsortk").innerHTML=COLS.filter(c=>c.sort).map(c=>`<option value="${c.k}">מיין לפי: ${c.l}</option>`).join("");
     $("psortk").innerHTML=`<option value="">מיין לפי: ברירת מחדל</option>`+PCOLS.filter(c=>c.sort).map(c=>`<option value="${c.k}">מיין לפי: ${c.l}</option>`).join("");
@@ -510,7 +572,7 @@ function renderTiers(){
 }
 
 function renderHead(){
-  const HK={score:"score",dd52:"dd",mos:"mos",pfcf:"pfcf",pe:"pe",roic:"roic",rev_g:"rev",timing:"timing",vol:"vol",tx:"tx",tech:"tech",btm:"btm",flags:"flags",atr:"atr",beta:"beta"};
+  const HK={score:"score",dd52:"dd",mos:"mos",pfcf:"pfcf",pe:"pe",roic:"roic",rev_g:"rev",timing:"timing",vol:"vol",tx:"tx",tech:"tech",btm:"btm",flags:"flags",atr:"atr",beta:"beta",wy:"wy"};
   $("thead").innerHTML = COLS.map((c,i)=>`<th data-i="${i}" class="${c.sort?"srt":""}" ${c.k===st.key?`aria-sort="${st.dir<0?"descending":"ascending"}"`:""}>${c.l}${qm(HK[c.k])}</th>`).join("");
   $("dsortk").value=st.key; $("dsortd").textContent=st.dir<0?"▼ מהגבוה":"▲ מהנמוך";
   $("thead").querySelectorAll("th").forEach(th=>th.onclick=()=>{
@@ -526,7 +588,7 @@ function apply(){
   const capOk=c=>!capf||(capf==="small"?c<2:capf==="mid"?c>=2&&c<10:c>=10);
   view = ALL.filter(s=>
     (st.tier==="all"||s.tier===st.tier) && (!sec||s.sector===sec) && (!tech||s.tech.state===tech) &&
-    (s.dd52??0)>=dd && (!onlyNew||s.new) && (!noRed||!s.red.length) && (!onlyBtm||(s.bottom||[]).length) && capOk(s.cap) && (!tmf||(s.timing&&s.timing.light===tmf)) && (vf===""||(s.vol&&s.vol.score>=+vf)) && txOk(s.vol,dtx,dav) && riskOk(s.risk,datr,dbeta) &&
+    (s.dd52??0)>=dd && (!onlyNew||s.new) && (!noRed||!s.red.length) && (!onlyBtm||(s.bottom||[]).length) && capOk(s.cap) && (!tmf||(s.timing&&s.timing.light===tmf)) && (vf===""||(s.vol&&s.vol.score>=+vf)) && txOk(s.vol,dtx,dav) && riskOk(s.risk,datr,dbeta) && wyOk(s.wy,$("dwy").value) &&
     (!q||s.t.toLowerCase().includes(q)||s.name.toLowerCase().includes(q)));
   const c=COLS.find(c=>c.k===st.key);
   view.sort((a,b)=>{const x=c.sort(a),y=c.sort(b); if(x==null&&y==null)return 0; if(x==null)return 1; if(y==null)return -1; return (x>y?1:x<y?-1:0)*st.dir;});
@@ -552,6 +614,7 @@ function renderRows(){
     <td data-label="עסקאות ביום" class="num">${s.vol&&s.vol.tx?`<span class="ltr">${fmtN(s.vol.tx.n20)}</span>`:'<span class="mut">—</span>'}</td>
     <td data-label="תנודה יומית">${atrCell(s.risk)}</td>
     <td data-label="בטא">${betaCell(s.risk)}</td>
+    <td data-label="וויקוף">${wyCell(s.wy)}</td>
     <td data-label="מצב טכני" class="tech">${TECH[s.tech.state]}</td>
     <td data-label="תצורת תחתית">${(s.bottom||[]).map(b=>`<span class="badge btm">${esc(b.n)}</span>`).join("")||'<span class="mut">—</span>'}</td>
     <td data-label="דגלים" class="flags">${s.red.length?`<span class="r">${s.red.length} אדומים</span> `:""}${s.yellow.length?`<span class="y">${s.yellow.length} צהובים</span>`:""}${!s.red.length&&!s.yellow.length?'<span class="mut">נקי</span>':""}</td>
@@ -592,6 +655,24 @@ const riskOk=(R,a,b)=>{
 const atrCell=R=>R&&R.atr!=null?`<span class="ltr num ${R.atr>0.04?"neg":R.atr<=0.02?"pos":""}">${(R.atr*100).toFixed(1)}%</span>`:'<span class="mut">—</span>';
 const betaCell=R=>R&&R.beta!=null?`<span class="ltr num">${R.beta.toFixed(2)}</span>`:'<span class="mut">—</span>';
 const cmp=(f,dir)=>(a,b)=>{const x=f(a),y=f(b); if(x==null&&y==null)return 0; if(x==null)return 1; if(y==null)return -1; return (x>y?1:x<y?-1:0)*dir;};
+const WYC={SPRING_CONFIRMED:"pos",MARKUP:"pos",ACCUMULATION:"pos",SPRING_POSSIBLE:"",POTENTIAL_ACCUMULATION:"",UNKNOWN:"mut",DISTRIBUTION:"neg",MARKDOWN:"neg"};
+const wyCell=W=>W?`<span class="${WYC[W.state]||""}">${esc(W.label)}</span> <span class="mut num ltr">${W.score}</span>`:'<span class="mut">—</span>';
+const wyOk=(W,f)=>!f||(W&&(f==="bull"?["SPRING_CONFIRMED","SPRING_POSSIBLE","MARKUP","ACCUMULATION","POTENTIAL_ACCUMULATION"].includes(W.state):f==="spring"?W.state.startsWith("SPRING"):f==="strong"?["SPRING_CONFIRMED","MARKUP","ACCUMULATION"].includes(W.state):W.state===f));
+function wyBlock(W){
+  if(!W) return "";
+  const $$=x=>x==null?"—":"$"+Number(x).toLocaleString("en-US");
+  return `<section class="blk"><h3><span>וויקוף — איפה המניה בסיפור?${qm("wy")}</span><small class="num">${W.score}/100</small></h3>
+    <div class="kv" style="margin:0 0 6px"><b class="${WYC[W.state]||""}">${esc(W.label)}</b>${qm("wyst")}<span>ביטחון: <b>${esc(W.conf)}</b></span></div>
+    <div class="stats" style="margin-bottom:8px">
+      <div class="stat"><span>רצפת הטווח${qm("sup")}</span><b class="ltr num" style="font-size:16px">${$$(W.support)}</b></div>
+      <div class="stat"><span>תקרת הטווח</span><b class="ltr num" style="font-size:16px">${$$(W.resistance)}</b></div>
+      <div class="stat"><span>נקודת ביטול${qm("stop")}</span><b class="ltr num" style="font-size:16px">${$$(W.inval)}</b></div>
+    </div>
+    ${W.events.length?`<table class="chk">${W.events.map(e=>`<tr><td class="mut num ltr" style="width:64px">${esc(e.d)}</td><td>${esc(e.t)}${e.e.startsWith("SPRING")?qm("spring"):""}</td></tr>`).join("")}</table>`:'<p class="mut" style="font-size:13px;margin:4px 0 0">לא נמצאו אירועים ברורים בחצי השנה האחרונה.</p>'}
+    ${W.flags.length?`<div class="flagbox y"><ul>${W.flags.map(f=>`<li>${esc(f)}</li>`).join("")}</ul></div>`:""}
+    <p class="mut" style="font-size:12.5px;margin:8px 0 0">הסורק מזהה רק התנהגות מחיר וווליום שמתאימה לדפוס — לא את מה שגופים גדולים באמת עושים. לא משפיע על הציון.</p>
+  </section>`;
+}
 const txOk=(V,txv,avv)=>(txv===""||(V&&V.tx&&V.tx.n20>=+txv)) && (avv===""||(V&&V.av20>=+avv));
 const fmtN=x=>x==null?"—":x>=1e6?(x/1e6).toFixed(x>=1e7?0:1)+"M":x>=1e3?(x/1e3).toFixed(0)+"K":String(x);
 function volCell(V){
@@ -653,6 +734,7 @@ function openDrawer(t){
     ${checks("אופי הירידה", s.checks.d, s.d, "var(--d)")}
     ${s.risk?`<div class="kv" style="margin-top:14px"><span>תנודה יומית${qm("atr")} <b>${atrCell(s.risk)}</b></span><span>בטא${qm("beta")} <b>${betaCell(s.risk)}</b></span></div>`:""}
     ${s.timing?timingBlock(s.timing):""}
+    ${wyBlock(s.wy)}
     ${volBlock(s.vol)}
     <section class="blk"><h3><span>מגמות ${yrs}</span></h3><div class="sparks">
       ${spark("הכנסות ($B)", S.rev, x=>x.toFixed(1))}
@@ -699,13 +781,60 @@ document.querySelectorAll(".filtbtn").forEach(b=>b.onclick=()=>{
 });
 addEventListener("scroll",()=>{$("tip").hidden=true},true);
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeDrawer()});
-["q","sector","tech","dd","capf","tmf","vf","dtx","dav","datr","dbeta","onlynew","nored","onlybtm"].forEach(id=>$(id).addEventListener("input",()=>{shown=100;apply()}));
+["q","sector","tech","dd","capf","tmf","dwy","vf","dtx","dav","datr","dbeta","onlynew","nored","onlybtm"].forEach(id=>$(id).addEventListener("input",()=>{shown=100;apply()}));
 $("more").onclick=()=>{shown+=100;renderRows()};
+
+// ---------- הייפ ----------
+let HYPE=[], hs={key:null,dir:-1};
+const HCOLS=[
+  {k:"t",l:"מניה",sort:h=>h.t},
+  {k:"m",l:"אזכורים ברדיט",q:"ment",sort:h=>h.m},
+  {k:"mchg",l:"שינוי מאתמול",q:"mchg",sort:h=>h.mchg},
+  {k:"rk",l:"עלייה בדירוג",q:"rkup",sort:h=>h.rk_up},
+  {k:"rvol",l:"ווליום חריג",q:"rvol",sort:h=>h.rvol},
+  {k:"txj",l:"קפיצה בעסקאות",q:"txj",sort:h=>h.txj},
+  {k:"chg1",l:"שינוי מחיר היום",sort:h=>h.chg1},
+  {k:"chg5",l:"שינוי ב-5 ימים",sort:h=>h.chg5},
+];
+function renderHHead(){
+  $("hthead").innerHTML=HCOLS.map((c,i)=>`<th data-i="${i}" class="srt" ${c.k===hs.key?`aria-sort="${hs.dir<0?"descending":"ascending"}"`:""}>${c.l}${c.q?qm(c.q):""}</th>`).join("");
+  $("hthead").querySelectorAll("th").forEach(th=>th.onclick=()=>{
+    const c=HCOLS[+th.dataset.i];
+    if(hs.key===c.k) hs.dir*=-1; else {hs.key=c.k; hs.dir=c.k==="t"?1:-1;}
+    renderHHead(); applyHype();
+  });
+  $("hsortk").value=hs.key||""; $("hsortd").textContent=hs.dir<0?"▼ מהגבוה":"▲ מהנמוך";
+}
+function applyHype(){
+  const q=$("hq").value.trim().toLowerCase(), src=$("hsrc").value, mn=+$("hmin").value, nw=$("hnew").checked;
+  const v=HYPE.filter(h=>(!q||h.t.toLowerCase().includes(q)||(h.name||"").toLowerCase().includes(q)) &&
+    (!src||(src==="both"?h.src.length===2:h.src.includes(src))) && (!mn||(h.m||0)>=mn) && (!nw||h.new));
+  if(hs.key){ const c=HCOLS.find(x=>x.k===hs.key); v.sort(cmp(c.sort,hs.dir)); }
+  $("hcount").textContent=`${v.length.toLocaleString("he-IL")} תוצאות`;
+  $("hempty").hidden=v.length>0;
+  const sg=x=>{ if(x==null) return '<span class="mut">—</span>'; if(Math.abs(x)<0.0005) x=0;
+    return `<span class="ltr num ${x>0?"pos":x<0?"neg":""}">${(x>0?"+":"")+(x*100).toFixed(1)}%</span>`; };
+  $("hrows").innerHTML=addML(v.map(h=>`<tr data-t="${esc(h.t)}" tabindex="0">
+    <td class="lead"><span class="tk ltr">${esc(h.t)}</span>${h.new?'<span class="new" style="background:var(--amber-bg);color:var(--amber)">🔥 חדש</span>':""}<span class="nm">${esc(h.name||"")}</span></td>
+    <td data-label="אזכורים ברדיט" class="num">${h.m==null?'<span class="mut">—</span>':`<span class="ltr">${h.m.toLocaleString("en-US")}</span>`}</td>
+    <td data-label="שינוי מאתמול">${h.mchg==null?'<span class="mut">—</span>':`<span class="ltr num ${h.mchg>=1?"pos":""}">${(h.mchg>0?"+":"")+(h.mchg*100).toFixed(0)}%</span>`}</td>
+    <td data-label="עלייה בדירוג">${h.rk_up==null?'<span class="mut">—</span>':`<span class="ltr num ${h.rk_up>0?"pos":h.rk_up<0?"neg":""}">${h.rk_up>0?"▲ "+h.rk_up:h.rk_up<0?"▼ "+(-h.rk_up):"—"}</span>`}</td>
+    <td data-label="ווליום חריג">${h.rvol==null?'<span class="mut">—</span>':`<span class="ltr num ${h.rvol>=3?"pos":""}">${h.rvol.toFixed(1)}×</span>`}</td>
+    <td data-label="קפיצה בעסקאות">${h.txj==null?'<span class="mut">—</span>':`<span class="ltr num ${h.txj>=3?"pos":""}">${h.txj.toFixed(1)}×</span>`}</td>
+    <td data-label="שינוי מחיר היום">${sg(h.chg1)}</td>
+    <td data-label="שינוי ב-5 ימים">${sg(h.chg5)}</td>
+  </tr>`).join(""));
+  $("hrows").querySelectorAll("tr").forEach(tr=>{
+    const go=()=>window.open("https://finance.yahoo.com/quote/"+encodeURIComponent(tr.dataset.t),"_blank","noopener");
+    tr.onclick=go; tr.onkeydown=e=>{if(e.key==="Enter")go()};
+  });
+}
+["hq","hsrc","hmin","hnew"].forEach(id=>$(id).addEventListener("input",applyHype));
 
 // ---------- לשוניות ----------
 function showView(v){
   document.querySelectorAll(".tabs button").forEach(b=>b.setAttribute("aria-selected", b.dataset.v===v));
-  ["dip","pat","jr"].forEach(x=>$("view-"+x).hidden = x!==v);
+  ["dip","pat","hy","jr"].forEach(x=>$("view-"+x).hidden = x!==v);
   if(v==="jr") loadJournal();
   history.replaceState(null,"", v==="dip" ? location.pathname : "#"+v);
 }
@@ -724,6 +853,7 @@ const PCOLS=[
   {k:"rsi",l:"RSI",q:"rsi",sort:p=>p.rsi?p.rsi.rsi:null},
   {k:"atr",l:"תנודה יומית",q:"atr",sort:p=>p.risk?p.risk.atr:null},
   {k:"beta",l:"בטא",q:"beta",sort:p=>p.risk?p.risk.beta:null},
+  {k:"wy",l:"וויקוף",q:"wy",sort:p=>p.wy?p.wy.score:null},
   {k:"chart",l:"160 ימי מסחר",sort:null},
   {k:"score",l:"ציון Dip",q:"score",sort:p=>p.score},
 ];
@@ -762,7 +892,7 @@ function applyPat(){
   const typeOk=t=>!ptype||(ptype==="crypto"?(t==="coin"||t==="crypto_etf"):(t||"stock")===ptype);
   const v=PATS.filter(p=>{
     const xs=p.pats.filter(x=>(!pk||x.k===pk)&&(!st||x.st===st));
-    return xs.length && typeOk(p.type) && exOk(p) && (pvf===""||(p.vol&&p.vol.score>=+pvf)) && txOk(p.vol,ptx,pav) && riskOk(p.risk,patr,pbeta) && (!dip||p.tier==="green"||p.tier==="yellow") &&
+    return xs.length && typeOk(p.type) && exOk(p) && (pvf===""||(p.vol&&p.vol.score>=+pvf)) && txOk(p.vol,ptx,pav) && riskOk(p.risk,patr,pbeta) && wyOk(p.wy,$("pwy").value) && (!dip||p.tier==="green"||p.tier==="yellow") &&
       (!m150||(p.ma150!=null&&Math.abs(p.ma150)*100<=m150)) && (!up150||p.ma150_up) && (!q||p.t.toLowerCase().includes(q)||p.name.toLowerCase().includes(q));
   });
   if(ps.key){ const c=PCOLS.find(x=>x.k===ps.key); v.sort(cmp(c.sort,ps.dir)); }
@@ -781,6 +911,7 @@ function applyPat(){
       <td data-label="RSI">${p.rsi&&p.rsi.rsi!=null?`<span class="${p.rsi.s===1?"pos":p.rsi.s===0?"neg":""}">${esc(p.rsi.n)}</span> <span class="mut ltr num">${p.rsi.rsi}</span>`:'<span class="mut">—</span>'}</td>
       <td data-label="תנודה יומית">${atrCell(p.risk)}</td>
       <td data-label="בטא">${betaCell(p.risk)}</td>
+      <td data-label="וויקוף">${wyCell(p.wy)}</td>
       <td data-label="גרף">${mini(p)}</td>
       <td data-label="ציון Dip">${p.score==null?'<span class="mut">—</span>':`<span class="dot ${p.tier}"></span><span class="num">${p.score.toFixed(0)}</span>`}</td>
     </tr>`}).join(""));
@@ -789,7 +920,7 @@ function applyPat(){
     tr.onclick=go; tr.onkeydown=e=>{if(e.key==="Enter")go()};
   });
 }
-["pq","ptype","pex","pst","pvf","ptx","pav","patr","pbeta","pdip","p150","p150up"].forEach(id=>$(id).addEventListener("input",applyPat));
+["pq","ptype","pex","pst","pwy","pvf","ptx","pav","patr","pbeta","pdip","p150","p150up"].forEach(id=>$(id).addEventListener("input",applyPat));
 
 // ---------- יומן ----------
 let JR=null;
@@ -822,7 +953,8 @@ function renderJournal(){
         ${stat("עם תצורת תחתית", avg(b.map(r)), b.length)}
         ${(()=>{const lg=sn.stocks.filter(x=>x.light==="green"), lr=sn.stocks.filter(x=>x.light==="red");
           const lv=sn.stocks.filter(x=>x.vol!=null&&x.vol>=4), pv=sn.pats.filter(x=>x.vol!=null&&x.vol>=4);
-          return (lv.length?stat("Dip עם ווליום 4+", avg(lv.map(r)), lv.length):"") + (pv.length?stat("תבניות עם ווליום 4+", avg(pv.map(r)), pv.length):"") + (lg.length?stat("עם אור ירוק בתזמון", avg(lg.map(r)), lg.length):"")+(lr.length?stat("עם אור אדום בתזמון", avg(lr.map(r)), lr.length):"");})()}
+          const lw=sn.stocks.filter(x=>["SPRING_CONFIRMED","MARKUP","ACCUMULATION"].includes(x.wy)), hy=sn.hype||[];
+          return (lw.length?stat("Dip עם וויקוף חיובי", avg(lw.map(r)), lw.length):"") + (hy.length?stat("🔥 מניות בהייפ", avg(hy.map(r)), hy.length):"") + (lv.length?stat("Dip עם ווליום 4+", avg(lv.map(r)), lv.length):"") + (pv.length?stat("תבניות עם ווליום 4+", avg(pv.map(r)), pv.length):"") + (lg.length?stat("עם אור ירוק בתזמון", avg(lg.map(r)), lg.length):"")+(lr.length?stat("עם אור אדום בתזמון", avg(lr.map(r)), lr.length):"");})()}
         ${(()=>{const T=x=>x.type||"stock", ps=sn.pats.filter(x=>T(x)==="stock"), pe=sn.pats.filter(x=>T(x)==="etf"), pc=sn.pats.filter(x=>T(x)==="coin"||T(x)==="crypto_etf"), pi=sn.pats.filter(x=>T(x)==="intl");
           return stat("תבניות — מניות", avg(ps.map(r)), ps.length) + (pe.length?stat("תבניות — תעודות סל", avg(pe.map(r)), pe.length):"") + (pc.length?stat("תבניות — קריפטו", avg(pc.map(r)), pc.length):"") + (pi.length?stat("תבניות — בורסות זרות", avg(pi.map(r)), pi.length):"");})()}
         ${stat("S&P 500", spy)}
@@ -839,7 +971,7 @@ function renderJournal(){
           <td class="${x.r>=0?"pos":"neg"}">${pct(x.r,1)}</td></tr>`).join("")}</tbody></table></div></details>
     </div>`}).join("");
 }
-load().then(()=>{ const v=location.hash.slice(1); if(v==="pat"||v==="jr") showView(v); });
+load().then(()=>{ const v=location.hash.slice(1); if(v==="pat"||v==="jr"||v==="hy") showView(v); });
 </script>
 </body>
 </html>

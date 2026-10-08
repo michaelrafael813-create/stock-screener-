@@ -117,7 +117,7 @@ def sec_json(url, tries=4):
         time.sleep(3 + attempt * 5)
     raise RuntimeError(f"ה-SEC לא ענה עבור {url} — {last}")
 
-VERSION = "1.9.3"
+VERSION = "2.0"
 FULL = os.environ.get("FULL", "").lower() == "true"
 MAX_TICKERS = int(os.environ.get("MAX_TICKERS", "0") or 0)
 
@@ -529,7 +529,7 @@ def fetch_prices(tickers, period="5y"):
                     try:
                         sub = df[t] if isinstance(df.columns, pd.MultiIndex) else df
                         hh, ll = sub["High"].reindex(s.index), sub["Low"].reindex(s.index)
-                        HL[t] = (hh.values[-30:].astype(float), ll.values[-30:].astype(float))
+                        HL[t] = (hh.values[-160:].astype(float), ll.values[-160:].astype(float))
                     except Exception:
                         pass
             except Exception:
@@ -1690,6 +1690,255 @@ def volume_score(close, vol, hl=None, tx=None):
 
 
 # ===================================================================
+#  4ו. וויקוף "קל" — מבנה מחיר/ווליום. רק הצגה ומסנן, לא משפיע על שום ציון.
+#  הכלי לא יודע מה גופים גדולים עושים — הוא רק מזהה התנהגות שמתאימה לדפוס.
+# ===================================================================
+WY_STATE = {"UNKNOWN": "אין מבנה ברור", "POTENTIAL_ACCUMULATION": "איסוף אפשרי", "ACCUMULATION": "איסוף",
+            "SPRING_POSSIBLE": "ניעור אפשרי", "SPRING_CONFIRMED": "ניעור מאושר", "MARKUP": "פריצה ועלייה",
+            "DISTRIBUTION": "פיזור אפשרי", "MARKDOWN": "המשך ירידה"}
+
+
+def wyckoff(close, vol, hl, spy=None):
+    if hl is None or vol is None or len(vol) != len(close) or len(close) < 260:
+        return None
+    hh, ll = hl
+    n = min(len(hh), 150)
+    if n < 100:
+        return None
+    c = close.values[-n:].astype(float)
+    h, l = np.asarray(hh[-n:], float), np.asarray(ll[-n:], float)
+    v = vol.values[-n:].astype(float)
+    dates = [x.strftime("%d/%m/%y") for x in close.index[-n:]]
+    if not (np.all(np.isfinite(h)) and np.all(np.isfinite(l))) or np.mean(v) <= 0:
+        return None
+    full = close.values.astype(float)
+    off = len(full) - n
+    prev = np.concatenate([[c[0]], c[:-1]])
+    tr = np.maximum(h - l, np.maximum(abs(h - prev), abs(l - prev)))
+    atr = pd.Series(tr).rolling(20, min_periods=10).mean().values
+    avgv = pd.Series(v).shift(1).rolling(20, min_periods=10).mean().values
+    rvol = np.where(avgv > 0, v / np.where(avgv > 0, avgv, 1), 1.0)
+    rng = h - l
+    cloc = np.where(rng > 0, (c - l) / np.where(rng > 0, rng, 1), 0.5)
+    hi52 = float(np.max(full[-252:]))
+    dd = 1 - c[-1] / hi52
+    A = float(atr[-1]) if np.isfinite(atr[-1]) else float(np.nanmean(tr[-20:]))
+    ev, flags, score = [], [], 0
+
+    def a_at(i):
+        return atr[i] if np.isfinite(atr[i]) else A
+
+    def add(code, i, txt, pts):
+        nonlocal score
+        ev.append({"e": code, "d": dates[i], "t": txt})
+        score += pts
+
+    # --- שיא מכירות (SC): ווליום חריג, טווח רחב, שפל מקומי, אחרי ירידה ---
+    sc = None
+    for i in range(10, n - 3):
+        prior_hi = float(np.max(full[max(0, off + i - 120):off + i]))
+        if rvol[i] >= 2 and rng[i] >= 1.5 * a_at(i) and l[i] <= np.min(l[max(0, i - 10):i + 11]) \
+                and cloc[i] >= 0.4 and c[i] <= prior_hi * 0.85:
+            sc = i
+    support = resistance = None
+    spring = sos = None
+    if sc is not None:
+        add("SC", sc, "שיא מכירות: יום ירידה עם ווליום חריג וטווח רחב, והסגירה לא בשפל — אולי המכירות מתמצות", 15)
+        support = float(l[sc])
+        win = list(range(sc + 1, min(sc + 11, n)))
+        ar = max(win, key=lambda j: h[j]) if win else None
+        if ar is not None and c[ar] >= c[sc] + 1.0 * a_at(sc):
+            add("AR", ar, "קפיצה אוטומטית: ריבאונד חד אחרי שיא המכירות, שקובע את תקרת הטווח", 8)
+            resistance = float(np.max(h[sc:ar + 1]))
+            for j in range(ar + 1, n):
+                if support * 0.97 <= l[j] <= max(support + 0.75 * A, support * 1.05) and rvol[j] <= 0.9:
+                    add("ST", j, "מבחן משני: חזרה לאזור השפל בווליום נמוך — פחות מוכרים", 12)
+                    break
+            for j in range(ar + 1, n):
+                if support - 1.5 * A <= l[j] < support and any(c[k] > support for k in range(j, min(j + 3, n))):
+                    spring = j
+            if spring is not None:
+                fw = range(spring + 1, min(spring + 16, n))
+                conf = 0
+                if any(c[k] > support and c[k - 1] > support for k in fw if k - 1 > spring):
+                    conf += 1
+                if any(l[k] > l[spring] and rvol[k] <= 0.8 for k in fw):
+                    conf += 1
+                if any(c[k] > resistance and rvol[k] >= 1.5 for k in fw):
+                    conf += 2
+                if any(c[k] < l[spring] - 0.5 * A for k in range(spring + 1, n)):
+                    add("SPRING_FAIL", spring, "ניעור שנכשל: המחיר ירד שוב מתחת לשפל של הניעור", -15)
+                    spring = None
+                elif conf >= 2:
+                    add("SPRING", spring, "ניעור מאושר: ירידה רגעית מתחת לרצפה, חזרה מהירה פנימה, והמשך חיובי", 20)
+                else:
+                    add("SPRING?", spring, "ניעור אפשרי: ירידה רגעית מתחת לרצפה וחזרה מהירה — מחכה לאישור", 10)
+            for j in range(ar + 1, n):
+                if c[j] > resistance and rvol[j] >= 1.5 and cloc[j] >= 0.6:
+                    sos = j
+                    add("SOS", j, "סימן חוזק: פריצה מעל תקרת הטווח בווליום גבוה", 15)
+                    for k in range(j + 2, n):
+                        if resistance * 0.97 <= l[k] <= resistance * 1.04 and rvol[k] <= 0.9:
+                            add("LPS", k, "נקודת תמיכה אחרונה: חזרה לתקרה הישנה בווליום נמוך, והיא החזיקה כרצפה", 10)
+                            break
+                    break
+    elif dd >= 0.25 and (np.max(h[-30:]) - np.min(l[-30:])) <= 8 * A:
+        support, resistance = float(np.min(l[-30:])), float(np.max(h[-30:]))
+        add("BASE", n - 30, "בסיס: אחרי ירידה גדולה המניה דשדשה בטווח צר כחודש וחצי", 8)
+
+    # --- שפלים עולים / יורדים (60 ימים) ---
+    lows = [i for i in range(n - 60, n - 3) if l[i] == np.min(l[max(0, i - 4):i + 5])]
+    if len(lows) >= 2:
+        if l[lows[-1]] > l[lows[-2]] * 1.01:
+            score += 8
+        elif l[lows[-1]] < l[lows[-2]] * 0.99:
+            score -= 10
+
+    # --- שבירת הטווח ---
+    broke = support is not None and c[-1] < support and any(c[k] < support * 0.97 and rvol[k] >= 1.5 for k in range(n - 15, n))
+    if broke:
+        add("SOW", n - 1, "שבירת רצפת הטווח בווליום גבוה — המבנה נכשל", -25)
+
+    # --- פיזור (אחרי עלייה גדולה) ---
+    dist = False
+    if c[-1] >= hi52 * 0.85 and full[-1] / np.min(full[-252:]) >= 1.3:
+        for i in range(n - 60, n - 3):
+            if rvol[i] >= 2 and rng[i] >= 1.5 * a_at(i) and cloc[i] <= 0.5 and h[i] >= np.max(h[max(0, i - 20):i + 1]):
+                top = float(h[i])
+                ut = any(h[k] > top and c[k] < top for k in range(i + 3, n))
+                weak = any(c[k] < np.min(l[i:i + 10]) and rvol[k] >= 1.5 for k in range(i + 3, n))
+                if ut or weak:
+                    dist = True
+                    add("BC", i, "שיא קנייה: יום של ווליום חריג ליד השיא עם סגירה חלשה", -10)
+                    add("UT" if ut else "SOW", n - 1, "פריצת שווא מעל השיא וחזרה מתחתיו" if ut else
+                        "ירידה מתחת לרצפת הטווח בווליום — סימן חולשה", -10)
+                break
+
+    # --- חוזק יחסי וממוצע 50 ---
+    if spy is not None and len(spy) > 25:
+        rs = (full[-1] / full[-21] - 1) - float(spy.iloc[-1] / spy.iloc[-21] - 1)
+        if rs > 0.02:
+            score += 7
+    if c[-1] > np.mean(full[-50:]):
+        score += 5
+
+    codes = {e["e"] for e in ev}
+    sma200 = float(np.mean(full[-200:]))
+    if broke:
+        state = "MARKDOWN"
+    elif dist:
+        state = "DISTRIBUTION"
+    elif sos is not None and c[-1] > (resistance or 0):
+        state = "MARKUP"
+    elif "SPRING" in codes:
+        state = "SPRING_CONFIRMED"
+    elif "SPRING?" in codes:
+        state = "SPRING_POSSIBLE"
+    elif sc is not None and "ST" in codes and c[-1] >= support:
+        state = "ACCUMULATION"
+    elif sc is not None or "BASE" in codes:
+        state = "POTENTIAL_ACCUMULATION"
+    elif full[-1] < sma200 and float(np.mean(full[-200:-180])) > sma200 and dd >= 0.2:
+        state = "MARKDOWN"
+        score -= 10
+    else:
+        state = "UNKNOWN"
+
+    sc_score = max(0, min(100, 30 + score))
+    if spy is not None and len(spy) > 200 and (spy.iloc[-1] < spy.iloc[-200:].mean() or spy.iloc[-1] / spy.iloc[-21] - 1 < -0.08):
+        sc_score = round(sc_score * 0.8)
+        flags.append("השוק כולו בלחץ — דפוסים כאלה מופיעים אז בהרבה מניות ופחות אמינים")
+    if np.median(full[-60:] * v[-60:]) < 5_000_000:
+        sc_score = round(sc_score * 0.7)
+        flags.append("מחזור מסחר נמוך — אותות הווליום פחות אמינים")
+    n_ev = len(codes & {"SC", "AR", "ST", "SPRING", "SOS", "LPS"})
+    conf = "גבוהה" if n_ev >= 4 else ("בינונית" if n_ev >= 2 else "נמוכה")
+    inval = l[spring] - 0.5 * A if spring is not None else (support - 0.5 * A if support is not None else None)
+    return {"state": state, "label": WY_STATE[state], "score": int(sc_score), "conf": conf,
+            "support": None if support is None else round(support, 2),
+            "resistance": None if resistance is None else round(resistance, 2),
+            "inval": None if inval is None else round(float(inval), 2), "events": ev[-8:], "flags": flags}
+
+
+# ===================================================================
+#  4ז. הייפ — לשונית עצמאית לגמרי. אזכורים ברדיט + קפיצות ווליום ועסקאות.
+#  לא משפיע על שום ציון ולא קשור לשום לשונית אחרת.
+# ===================================================================
+def fetch_reddit_mentions(pages=4):
+    out = []
+    for pg in range(1, pages + 1):
+        try:
+            r = requests.get(f"https://apewisdom.io/api/v1.0/filter/all-stocks/page/{pg}", timeout=30,
+                             headers={"User-Agent": "Mozilla/5.0 (personal stock screener)"})
+            js = r.json()
+            out += js.get("results") or []
+            if pg >= int(js.get("pages") or 1):
+                break
+            time.sleep(1)
+        except Exception as e:
+            log("  שגיאה בטעינת אזכורי רדיט:", e)
+            break
+    log(f"רדיט: {len(out)} מניות מוזכרות")
+    return out
+
+
+def build_hype(closes, vols, trades, names, us_tickers):
+    rows = {}
+    for x in fetch_reddit_mentions():
+        t = (x.get("ticker") or "").upper().replace(".", "-")
+        if not t:
+            continue
+        try:
+            m, m0 = int(x.get("mentions") or 0), int(x.get("mentions_24h_ago") or 0)
+            rk = int(x["rank"]) if x.get("rank") else None
+            rk0 = int(x["rank_24h_ago"]) if x.get("rank_24h_ago") else None
+        except Exception:
+            continue
+        rows[t] = {"t": t, "name": names.get(t) or x.get("name") or t, "m": m, "m0": m0,
+                   "mchg": None if not m0 else round(m / m0 - 1, 3), "rank": rk,
+                   "rk_up": (rk0 - rk) if rk and rk0 else None, "up": int(x.get("upvotes") or 0)}
+    days = sorted(trades)[-21:] if trades else []
+    for t in us_tickers:
+        if t not in closes or t not in vols:
+            continue
+        c, v = closes[t], vols[t]
+        if len(v) < 25 or float(v.iloc[-21:-1].mean()) <= 0:
+            continue
+        rv = float(v.iloc[-1] / v.iloc[-21:-1].mean())
+        txj = None
+        if days:
+            ns = [(trades[d].get(t) or [None, None])[1] for d in days]
+            ns = [x for x in ns if x]
+            if len(ns) >= 10 and np.mean(ns[:-1]) > 0:
+                txj = round(ns[-1] / float(np.mean(ns[:-1])), 2)
+        hot = rv >= 3 or (txj is not None and txj >= 3)
+        if t in rows or hot:
+            r = rows.setdefault(t, {"t": t, "name": names.get(t, t), "m": None, "m0": None, "mchg": None,
+                                    "rank": None, "rk_up": None, "up": None})
+            r["rvol"] = round(rv, 2)
+            r["txj"] = txj
+            r["chg1"] = round(float(c.iloc[-1] / c.iloc[-2] - 1), 4)
+            r["chg5"] = round(float(c.iloc[-1] / c.iloc[-6] - 1), 4) if len(c) > 6 else None
+            r["price"] = round(float(c.iloc[-1]), 2)
+    out = []
+    for r in rows.values():
+        src = []
+        if r.get("m"):
+            src.append("reddit")
+        if (r.get("rvol") or 0) >= 3 or (r.get("txj") or 0) >= 3:
+            src.append("volume")
+        if not src:
+            continue
+        r["src"] = src
+        r["new"] = bool((r.get("m") or 0) >= 10 and r.get("m0") is not None and r["m"] >= 3 * max(r["m0"], 1)) \
+            or (r.get("rvol") or 0) >= 5
+        out.append(r)
+    out.sort(key=lambda r: (-(r.get("m") or 0), -(r.get("rvol") or 0)))
+    log(f"הייפ: {len(out)} מניות")
+    return out[:400]
+
+
+# ===================================================================
 #  4ג. יומן ביצועים חודשי
 # ===================================================================
 def load_journal():
@@ -1710,7 +1959,7 @@ def load_journal():
     return {"snaps": []}
 
 
-def update_journal(j, results, patterns, closes, spy):
+def update_journal(j, results, patterns, closes, spy, hype=None):
     today = dt.date.today()
     month = today.strftime("%Y-%m")
     if spy is not None and not any(sn["month"] == month for sn in j["snaps"]):
@@ -1718,13 +1967,16 @@ def update_journal(j, results, patterns, closes, spy):
             "month": month, "date": today.isoformat(), "spy": round(spy, 2),
             "stocks": [{"t": r["t"], "tier": r["tier"], "price": r["price"], "score": r["score"],
                         "bottom": [b["k"] for b in r.get("bottom", [])],
-                        "light": (r.get("timing") or {}).get("light"), "vol": (r.get("vol") or {}).get("score")}
+                        "light": (r.get("timing") or {}).get("light"), "vol": (r.get("vol") or {}).get("score"),
+                        "wy": (r.get("wy") or {}).get("state")}
                        for r in results if r["tier"] in ("green", "yellow")],
+            "hype": [{"t": h["t"], "price": h["price"], "m": h.get("m"), "new": h.get("new")}
+                     for h in (hype or [])[:40] if h.get("price")],
             "pats": [{"t": p["t"], "type": p.get("type", "stock"), "vol": (p.get("vol") or {}).get("score"), "p": [x["k"] for x in p["pats"]], "st": [x["st"] for x in p["pats"]], "price": p["price"]}
                      for p in patterns],
         })
         log(f"נשמר צילום חודשי ליומן: {month}")
-    tickers = {x["t"] for sn in j["snaps"] for x in sn["stocks"] + sn["pats"]}
+    tickers = {x["t"] for sn in j["snaps"] for x in sn["stocks"] + sn["pats"] + sn.get("hype", [])}
     j["now"] = {t: round(float(closes[t].iloc[-1]), 2) for t in tickers if t in closes}
     j["tier_now"] = {r["t"]: r["tier"] for r in results if r["t"] in tickers}
     j["spy_now"] = None if spy is None else round(spy, 2)
@@ -1763,7 +2015,7 @@ def main():
         etfs = etfs[:MAX_TICKERS]
     etf_info = {e["t"]: e for e in etfs}
     side = set(etf_info) | set(COINS)
-    extra = sorted({x["t"] for sn in journal["snaps"] for x in sn["stocks"] + sn["pats"]} - set(tickers) - side)
+    extra = sorted({x["t"] for sn in journal["snaps"] for x in sn["stocks"] + sn["pats"] + sn.get("hype", [])} - set(tickers) - side)
     all_t = tickers + [t for t in uni_t if t not in fund] + extra + ["SPY"]
     log(f"מוריד מחירים עבור {len(all_t)} מניות...")
     closes, vols = fetch_prices(list(dict.fromkeys(all_t)))
@@ -1824,6 +2076,10 @@ def main():
             r["timing"] = tm
             r["vol"] = volume_score(closes[t], vols.get(t), HL.get(t), txs)
             r["risk"] = risk_stats(closes[t], closes.get("SPY"), HL.get(t))
+            try:
+                r["wy"] = wyckoff(closes[t], vols.get(t), HL.get(t), closes.get("SPY"))
+            except Exception:
+                r["wy"] = None
             r["yellow"].extend(tm["flags"])
             if tm["light"] == "red" and r["tier"] == "green":
                 r["tier"] = "yellow"
@@ -1903,15 +2159,24 @@ def main():
             p["risk"] = risk_stats(closes[p["t"]], closes.get("SPY"), HL.get(p["t"]))
         except Exception:
             p["risk"] = None
+        try:
+            p["wy"] = wyckoff(closes[p["t"]], vols.get(p["t"]), HL.get(p["t"]), closes.get("SPY")) if p.get("type") != "coin" else None
+        except Exception:
+            p["wy"] = None
     patterns.sort(key=lambda p: (0 if any(x["st"] == "breakout" for x in p["pats"]) else 1, -(p["vr"] or 0)))
     log(f"תבניות: {len(patterns)} מניות")
 
+    try:
+        hype = build_hype(closes, vols, trades, {u["t"]: u["name"] for u in uni}, [u["t"] for u in uni])
+    except Exception as e:
+        log("שגיאה בהייפ:", e)
+        hype = []
     state_path.write_text(json.dumps(state))
-    out = {"generated": dt.datetime.utcnow().isoformat() + "Z", "version": VERSION, "count": len(results), "config": CONFIG,
+    out = {"hype": hype, "generated": dt.datetime.utcnow().isoformat() + "Z", "version": VERSION, "count": len(results), "config": CONFIG,
            "stocks": results, "patterns": patterns}
     (DATA / "results.json").write_text(json.dumps(clean(out), ensure_ascii=False, separators=(",", ":"), allow_nan=False))
 
-    journal = clean(update_journal(journal, results, patterns, closes, spy))
+    journal = clean(update_journal(journal, results, patterns, closes, spy, hype))
     jtxt = json.dumps(journal, ensure_ascii=False, separators=(",", ":"))
     (DATA / "journal.json").write_text(jtxt)
     site = Path("site")
