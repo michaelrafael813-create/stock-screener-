@@ -117,7 +117,7 @@ def sec_json(url, tries=4):
         time.sleep(3 + attempt * 5)
     raise RuntimeError(f"ה-SEC לא ענה עבור {url} — {last}")
 
-VERSION = "2.0"
+VERSION = "2.1"
 FULL = os.environ.get("FULL", "").lower() == "true"
 MAX_TICKERS = int(os.environ.get("MAX_TICKERS", "0") or 0)
 
@@ -1861,32 +1861,84 @@ def wyckoff(close, vol, hl, spy=None):
 
 
 # ===================================================================
-#  4ז. הייפ — לשונית עצמאית לגמרי. אזכורים ברדיט + קפיצות ווליום ועסקאות.
+#  4ז. הייפ — לשונית עצמאית לגמרי. כמה מדברים על המניה עכשיו, מכמה מקורות:
+#  רדיט (ApeWisdom), StockTwits, החיפושים ב-Yahoo, וקפיצות מסחר/עסקאות.
 #  לא משפיע על שום ציון ולא קשור לשום לשונית אחרת.
 # ===================================================================
+# סימולים שהם גם מילים או סלנג של סוחרים — ברדיט נספרים בטעות.
+# הם נכנסים לרשימה רק אם מקור נוסף מאשר שבאמת מדברים על המניה.
+AMBIGUOUS = set("""A AI ALL AM AN ANY ARE AT BE BIG BOX CAN CASH CEO CFO DD DTE EAT EPS EV FAST FOR FUN GO GOOD
+HE HOLD IPO IT KEY LIFE LOVE MAN ME MOON NEW NICE NOW ON ONE OPEN OR OUT PLAY POST REAL RUN SEE SO TRUE TWO UP US
+USA VERY WELL WIN YOLO ATH OG PM EOD EOY IRS SEC FED GDP CPI NFP RH TV U OPEN BIT FOMO HUGE LOW TOP PEAK DIP""".split())
+UA_WEB = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+          "Accept": "application/json, text/plain, */*"}
+
+
 def fetch_reddit_mentions(pages=4):
     out = []
     for pg in range(1, pages + 1):
         try:
-            r = requests.get(f"https://apewisdom.io/api/v1.0/filter/all-stocks/page/{pg}", timeout=30,
-                             headers={"User-Agent": "Mozilla/5.0 (personal stock screener)"})
+            r = requests.get(f"https://apewisdom.io/api/v1.0/filter/all-stocks/page/{pg}", timeout=30, headers=UA_WEB)
             js = r.json()
             out += js.get("results") or []
             if pg >= int(js.get("pages") or 1):
                 break
             time.sleep(1)
         except Exception as e:
-            log("  שגיאה בטעינת אזכורי רדיט:", e)
+            log("  רדיט: שגיאה —", e)
             break
-    log(f"רדיט: {len(out)} מניות מוזכרות")
+    log(f"  רדיט: {len(out)} סימולים")
     return out
 
 
+def fetch_stocktwits_trending():
+    """הטרנדים של StockTwits — רשת חברתית של סוחרים. מחזיר {סימול: מקום}."""
+    try:
+        r = requests.get("https://api.stocktwits.com/api/2/trending/symbols.json", timeout=30, headers=UA_WEB)
+        syms = (r.json() or {}).get("symbols") or []
+        out = {}
+        for i, x in enumerate(syms):
+            t = (x.get("symbol") or "").upper().replace(".", "-")
+            if t and t not in out:
+                out[t] = i + 1
+        log(f"  StockTwits: {len(out)} סימולים בטרנד")
+        return out
+    except Exception as e:
+        log("  StockTwits: לא זמין כרגע —", e)
+        return {}
+
+
+def fetch_yahoo_trending():
+    """המניות שהכי מחפשים עכשיו ב-Yahoo Finance. מחזיר {סימול: מקום}."""
+    for host in ("query1", "query2"):
+        try:
+            r = requests.get(f"https://{host}.finance.yahoo.com/v1/finance/trending/US?count=50", timeout=30, headers=UA_WEB)
+            q = (((r.json() or {}).get("finance") or {}).get("result") or [{}])[0].get("quotes") or []
+            out = {}
+            for i, x in enumerate(q):
+                t = (x.get("symbol") or "").upper().replace(".", "-")
+                if t and t not in out:
+                    out[t] = i + 1
+            if out:
+                log(f"  Yahoo: {len(out)} סימולים בטרנד")
+                return out
+        except Exception as e:
+            log(f"  Yahoo ({host}): לא זמין —", e)
+    return {}
+
+
 def build_hype(closes, vols, trades, names, us_tickers):
+    log("הייפ:")
+    allowed = set(us_tickers)  # רק מניות בארה"ב (בלי תעודות סל)
     rows = {}
+
+    def row(t):
+        return rows.setdefault(t, {"t": t, "name": names.get(t, t), "m": None, "m0": None, "mchg": None, "rank": None,
+                                   "rk_up": None, "up": None, "st": None, "yh": None, "rvol": None, "txj": None})
+
     for x in fetch_reddit_mentions():
         t = (x.get("ticker") or "").upper().replace(".", "-")
-        if not t:
+        if t not in allowed:
             continue
         try:
             m, m0 = int(x.get("mentions") or 0), int(x.get("mentions_24h_ago") or 0)
@@ -1894,9 +1946,16 @@ def build_hype(closes, vols, trades, names, us_tickers):
             rk0 = int(x["rank_24h_ago"]) if x.get("rank_24h_ago") else None
         except Exception:
             continue
-        rows[t] = {"t": t, "name": names.get(t) or x.get("name") or t, "m": m, "m0": m0,
-                   "mchg": None if not m0 else round(m / m0 - 1, 3), "rank": rk,
-                   "rk_up": (rk0 - rk) if rk and rk0 else None, "up": int(x.get("upvotes") or 0)}
+        r = row(t)
+        r.update({"m": m, "m0": m0, "mchg": None if not m0 else round(m / m0 - 1, 3), "rank": rk,
+                  "rk_up": (rk0 - rk) if rk and rk0 else None, "up": int(x.get("upvotes") or 0)})
+    for t, rk in fetch_stocktwits_trending().items():
+        if t in allowed:
+            row(t)["st"] = rk
+    for t, rk in fetch_yahoo_trending().items():
+        if t in allowed:
+            row(t)["yh"] = rk
+
     days = sorted(trades)[-21:] if trades else []
     for t in us_tickers:
         if t not in closes or t not in vols:
@@ -1911,31 +1970,52 @@ def build_hype(closes, vols, trades, names, us_tickers):
             ns = [x for x in ns if x]
             if len(ns) >= 10 and np.mean(ns[:-1]) > 0:
                 txj = round(ns[-1] / float(np.mean(ns[:-1])), 2)
-        hot = rv >= 3 or (txj is not None and txj >= 3)
-        if t in rows or hot:
-            r = rows.setdefault(t, {"t": t, "name": names.get(t, t), "m": None, "m0": None, "mchg": None,
-                                    "rank": None, "rk_up": None, "up": None})
-            r["rvol"] = round(rv, 2)
-            r["txj"] = txj
+        if t in rows or rv >= 3 or (txj or 0) >= 3:
+            r = row(t)
+            r["rvol"], r["txj"] = round(rv, 2), txj
             r["chg1"] = round(float(c.iloc[-1] / c.iloc[-2] - 1), 4)
             r["chg5"] = round(float(c.iloc[-1] / c.iloc[-6] - 1), 4) if len(c) > 6 else None
             r["price"] = round(float(c.iloc[-1]), 2)
+
     out = []
     for r in rows.values():
+        m = r.get("m") or 0
+        vol_hot = (r.get("rvol") or 0) >= 2.5 or (r.get("txj") or 0) >= 2.5
+        others = sum([r.get("st") is not None, r.get("yh") is not None, vol_hot])
+        reddit_ok = m >= 10 or (m >= 3 and others >= 1)
+        if r["t"] in AMBIGUOUS and others == 0:
+            reddit_ok = False  # מילה רגילה ואין אישור ממקור אחר — כנראה לא באמת מדברים על המניה
         src = []
-        if r.get("m"):
+        pts = 0.0
+        if reddit_ok and m:
             src.append("reddit")
-        if (r.get("rvol") or 0) >= 3 or (r.get("txj") or 0) >= 3:
+            pts += min(35, 12 * math.log10(1 + m))
+            if r.get("mchg") is not None and r["mchg"] >= 1 and m >= 10:
+                pts += 5
+        if r.get("st") is not None:
+            src.append("stocktwits")
+            pts += 25 * max(0.3, 1 - (r["st"] - 1) / 30)
+        if r.get("yh") is not None:
+            src.append("yahoo")
+            pts += 20 * max(0.3, 1 - (r["yh"] - 1) / 30)
+        if vol_hot:
             src.append("volume")
+            pts += min(20, 5 * (max(r.get("rvol") or 0, r.get("txj") or 0) - 1))
         if not src:
             continue
+        if len(src) >= 3:
+            pts += 10
         r["src"] = src
-        r["new"] = bool((r.get("m") or 0) >= 10 and r.get("m0") is not None and r["m"] >= 3 * max(r["m0"], 1)) \
-            or (r.get("rvol") or 0) >= 5
+        r["hs"] = int(min(100, round(pts)))
+        r["new"] = bool((m >= 10 and r.get("m0") is not None and m >= 3 * max(r["m0"], 1))
+                        or (r.get("rvol") or 0) >= 5 or (r.get("st") is not None and r.get("m0") == 0))
+        if not reddit_ok:
+            r["m"] = r["mchg"] = r["rk_up"] = None
         out.append(r)
-    out.sort(key=lambda r: (-(r.get("m") or 0), -(r.get("rvol") or 0)))
-    log(f"הייפ: {len(out)} מניות")
-    return out[:400]
+    out.sort(key=lambda r: -r["hs"])
+    multi = sum(1 for r in out if len(r["src"]) >= 2)
+    log(f"  הייפ: {len(out)} מניות, {multi} מהן מופיעות ביותר ממקור אחד")
+    return out[:300]
 
 
 # ===================================================================
@@ -1970,7 +2050,7 @@ def update_journal(j, results, patterns, closes, spy, hype=None):
                         "light": (r.get("timing") or {}).get("light"), "vol": (r.get("vol") or {}).get("score"),
                         "wy": (r.get("wy") or {}).get("state")}
                        for r in results if r["tier"] in ("green", "yellow")],
-            "hype": [{"t": h["t"], "price": h["price"], "m": h.get("m"), "new": h.get("new")}
+            "hype": [{"t": h["t"], "price": h["price"], "m": h.get("m"), "hs": h.get("hs"), "new": h.get("new")}
                      for h in (hype or [])[:40] if h.get("price")],
             "pats": [{"t": p["t"], "type": p.get("type", "stock"), "vol": (p.get("vol") or {}).get("score"), "p": [x["k"] for x in p["pats"]], "st": [x["st"] for x in p["pats"]], "price": p["price"]}
                      for p in patterns],
