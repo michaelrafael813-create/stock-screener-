@@ -117,7 +117,7 @@ def sec_json(url, tries=4):
         time.sleep(3 + attempt * 5)
     raise RuntimeError(f"ה-SEC לא ענה עבור {url} — {last}")
 
-VERSION = "2.1"
+VERSION = "2.2"
 FULL = os.environ.get("FULL", "").lower() == "true"
 MAX_TICKERS = int(os.environ.get("MAX_TICKERS", "0") or 0)
 
@@ -492,6 +492,7 @@ def refresh_fundamentals(universe):
 #  3. מחירים
 # ===================================================================
 HL = {}  # מחיר גבוה/נמוך יומי — למיקום הסגירה בטווח היום
+OPN = {}  # מחיר פתיחה יומי — לזיהוי נרות
 
 
 def fetch_prices(tickers, period="5y"):
@@ -530,6 +531,7 @@ def fetch_prices(tickers, period="5y"):
                         sub = df[t] if isinstance(df.columns, pd.MultiIndex) else df
                         hh, ll = sub["High"].reindex(s.index), sub["Low"].reindex(s.index)
                         HL[t] = (hh.values[-160:].astype(float), ll.values[-160:].astype(float))
+                        OPN[t] = sub["Open"].reindex(s.index).values[-160:].astype(float)
                     except Exception:
                         pass
             except Exception:
@@ -2019,6 +2021,106 @@ def build_hype(closes, vols, trades, names, us_tickers):
 
 
 # ===================================================================
+#  4ח. נרות היפוך ליד תמיכה — רק הצגה ומסנן, לא משפיע על שום ציון.
+#  נר בולע שורי, פטיש, כוכב בוקר: רק אחרי ירידה, וליד רצפה.
+# ===================================================================
+CANDLE_N = {"engulf": "נר בולע שורי", "hammer": "פטיש", "mstar": "כוכב בוקר"}
+CANDLE_ST = {"confirmed": "מאושר", "pending": "ממתין לאישור", "failed": "בוטל"}
+
+
+def candle_signal(close, vol, hl, opn):
+    if hl is None or opn is None or vol is None or len(close) < 220:
+        return None
+    hh, ll = hl
+    n = min(len(hh), len(opn), 160)
+    c = close.values[-n:].astype(float)
+    h, l, o = np.asarray(hh[-n:], float), np.asarray(ll[-n:], float), np.asarray(opn[-n:], float)
+    v = vol.values[-n:].astype(float)
+    if not (np.all(np.isfinite(o[-25:])) and np.all(np.isfinite(h[-25:])) and np.all(np.isfinite(l[-25:]))):
+        return None
+    full = close.values.astype(float)
+    off = len(full) - n
+    dates = [x.strftime("%d/%m/%y") for x in close.index[-n:]]
+    rng = h - l
+    body = np.abs(c - o)
+    prev = np.concatenate([[c[0]], c[:-1]])
+    atr = pd.Series(np.maximum(rng, np.maximum(abs(h - prev), abs(l - prev)))).rolling(20, min_periods=10).mean().values
+
+    def supports(i):
+        """רצפות אפשריות ביום i: שפל קודם, ממוצע 50, ממוצע 200."""
+        out = []
+        k = off + i
+        past = full[max(0, k - 250):max(0, k - 15)]
+        if len(past) > 30:
+            # רק שפלים משמעותיים: הנמוך ביותר בטווח של ±15 יום, ואחריו עלייה של 8% לפחות
+            for j in range(15, len(past) - 15):
+                w = past[j - 15:j + 16]
+                if past[j] == w.min() and np.max(past[j:j + 60]) >= past[j] * 1.07:
+                    out.append(("שפל קודם", float(past[j])))
+        if k >= 50:
+            out.append(("ממוצע 50", float(np.mean(full[k - 49:k + 1]))))
+        if k >= 200:
+            out.append(("ממוצע 200", float(np.mean(full[k - 199:k + 1]))))
+        return out
+
+    best = None
+    for i in range(n - 5, n):
+        if i < 20:
+            continue
+        a = atr[i] if np.isfinite(atr[i]) else np.nanmean(rng[-20:])
+        found = None
+        # נר בולע שורי
+        if c[i - 1] < o[i - 1] and c[i] > o[i] and o[i] <= c[i - 1] and c[i] >= o[i - 1] and body[i] > body[i - 1] * 1.1 \
+                and body[i] >= 0.5 * a:
+            found = ("engulf", i, min(l[i], l[i - 1]), (o[i] + c[i]) / 2)
+        # פטיש
+        elif rng[i] > 0 and body[i] > 0 and (min(o[i], c[i]) - l[i]) >= 2 * body[i] and (h[i] - max(o[i], c[i])) <= 0.3 * rng[i] \
+                and rng[i] >= 0.8 * a:
+            found = ("hammer", i, l[i], (h[i] + l[i]) / 2)
+        # כוכב בוקר
+        elif i >= 2 and c[i - 2] < o[i - 2] and body[i - 2] >= 0.6 * a and body[i - 1] <= 0.35 * body[i - 2] \
+                and c[i] > o[i] and c[i] >= (o[i - 2] + c[i - 2]) / 2:
+            found = ("mstar", i, min(l[i - 2], l[i - 1], l[i]), (o[i] + c[i]) / 2)
+        if not found:
+            continue
+        k, idx, low, mid = found
+        # הקשר: אחרי ירידה (5%+ מהשיא של 40 הימים, או מתחת לממוצע 20 ונמוך מלפני שבועיים), והנר בשפל מקומי
+        start = max(0, idx - 20)
+        fell = c[idx - 1] <= np.max(c[max(0, idx - 40):idx]) * 0.95 or             (idx >= 11 and c[idx - 1] < c[idx - 11] and c[idx - 1] < np.mean(c[start:idx]))
+        if not fell or low > np.min(l[start:idx]) * 1.02:
+            continue
+        # ליד תמיכה: השפל של הנר עד 3% מרצפה (או ירד מתחתיה וסגר מעליה)
+        sup = None
+        for name, lvl in supports(idx):
+            if lvl <= 0:
+                continue
+            if abs(low / lvl - 1) <= 0.02 or (low < lvl <= c[idx] and low >= lvl * 0.97):
+                if sup is None or abs(low / lvl - 1) < abs(low / sup[1] - 1):
+                    sup = (name, lvl)
+        if sup is None:
+            continue
+        avgv = float(np.mean(v[max(0, idx - 20):idx])) or 1
+        if v[idx] < avgv:  # נר בלי השתתפות — לא נחשב
+            continue
+        vol_ok = bool(v[idx] >= 1.2 * avgv)
+        # סטטוס: בוטל אם סגירה מתחת לשפל הנר; מאושר אם היום שאחרי החזיק מעל האמצע
+        after = range(idx + 1, n)
+        if any(c[j] < low for j in after):
+            st = "failed"
+        elif len(after) and c[idx + 1] >= mid:
+            st = "confirmed"
+        else:
+            st = "pending"
+        strong = bool(c[idx] > h[idx - 1]) if k == "engulf" else False
+        sig = {"k": k, "n": CANDLE_N[k], "d": dates[idx], "st": st, "stn": CANDLE_ST[st], "sup": sup[0],
+               "sup_lvl": round(sup[1], 2), "low": round(float(low), 2), "vol_ok": vol_ok, "strong": strong,
+               "days": int(n - 1 - idx)}
+        if best is None or (st != "failed" and best["st"] == "failed") or (st == best["st"] and idx >= n - 1 - best["days"]):
+            best = sig
+    return best
+
+
+# ===================================================================
 #  4ג. יומן ביצועים חודשי
 # ===================================================================
 def load_journal():
@@ -2048,7 +2150,8 @@ def update_journal(j, results, patterns, closes, spy, hype=None):
             "stocks": [{"t": r["t"], "tier": r["tier"], "price": r["price"], "score": r["score"],
                         "bottom": [b["k"] for b in r.get("bottom", [])],
                         "light": (r.get("timing") or {}).get("light"), "vol": (r.get("vol") or {}).get("score"),
-                        "wy": (r.get("wy") or {}).get("state")}
+                        "wy": (r.get("wy") or {}).get("state"),
+                        "candle": (r.get("candle") or {}).get("st")}
                        for r in results if r["tier"] in ("green", "yellow")],
             "hype": [{"t": h["t"], "price": h["price"], "m": h.get("m"), "hs": h.get("hs"), "new": h.get("new")}
                      for h in (hype or [])[:40] if h.get("price")],
@@ -2160,6 +2263,10 @@ def main():
                 r["wy"] = wyckoff(closes[t], vols.get(t), HL.get(t), closes.get("SPY"))
             except Exception:
                 r["wy"] = None
+            try:
+                r["candle"] = candle_signal(closes[t], vols.get(t), HL.get(t), OPN.get(t))
+            except Exception:
+                r["candle"] = None
             r["yellow"].extend(tm["flags"])
             if tm["light"] == "red" and r["tier"] == "green":
                 r["tier"] = "yellow"
@@ -2243,6 +2350,10 @@ def main():
             p["wy"] = wyckoff(closes[p["t"]], vols.get(p["t"]), HL.get(p["t"]), closes.get("SPY")) if p.get("type") != "coin" else None
         except Exception:
             p["wy"] = None
+        try:
+            p["candle"] = candle_signal(closes[p["t"]], vols.get(p["t"]), HL.get(p["t"]), OPN.get(p["t"]))
+        except Exception:
+            p["candle"] = None
     patterns.sort(key=lambda p: (0 if any(x["st"] == "breakout" for x in p["pats"]) else 1, -(p["vr"] or 0)))
     log(f"תבניות: {len(patterns)} מניות")
 

@@ -223,7 +223,16 @@ footer{max-width:1280px;margin:0 auto 30px;padding:0 20px;color:var(--muted);fon
     <option value="amber">🟡 אור צהוב</option>
     <option value="red">🔴 אור אדום</option>
   </select>
-<select id="dwy" aria-label="וויקוף">
+<select id="dcd" aria-label="נר היפוך">
+      <option value="">כל המניות (נרות)</option>
+      <option value="active">נר היפוך: מאושר או ממתין</option>
+      <option value="confirmed">נר היפוך: רק מאושר</option>
+      <option value="pending">נר היפוך: ממתין לאישור</option>
+      <option value="engulf">נר בולע שורי</option>
+      <option value="hammer">פטיש</option>
+      <option value="mstar">כוכב בוקר</option>
+    </select>
+  <select id="dwy" aria-label="וויקוף">
       <option value="">כל מצבי וויקוף</option>
       <option value="strong">וויקוף: איסוף / ניעור מאושר / פריצה</option>
       <option value="bull">וויקוף: כל סימן חיובי (כולל אפשרי)</option>
@@ -317,7 +326,16 @@ footer{max-width:1280px;margin:0 auto 30px;padding:0 20px;color:var(--muted);fon
       <option value="breakout">רק כאלה שפרצו</option>
       <option value="near">רק קרובות לפריצה</option>
     </select>
-<select id="pwy" aria-label="וויקוף">
+<select id="pcd" aria-label="נר היפוך">
+      <option value="">כל המניות (נרות)</option>
+      <option value="active">נר היפוך: מאושר או ממתין</option>
+      <option value="confirmed">נר היפוך: רק מאושר</option>
+      <option value="pending">נר היפוך: ממתין לאישור</option>
+      <option value="engulf">נר בולע שורי</option>
+      <option value="hammer">פטיש</option>
+      <option value="mstar">כוכב בוקר</option>
+    </select>
+    <select id="pwy" aria-label="וויקוף">
       <option value="">כל מצבי וויקוף</option>
       <option value="strong">וויקוף: איסוף / ניעור מאושר / פריצה</option>
       <option value="bull">וויקוף: כל סימן חיובי (כולל אפשרי)</option>
@@ -438,7 +456,7 @@ const TIERS = {
 const TECH = {down:"🔻 בירידה", flat:"➖ מתייצבת", up:"🔼 מתאוששת"};
 const LIGHT = {green:"🟢", amber:"🟡", red:"🔴"};
 const LIGHTN = {green:"אור ירוק — התזמון תומך", amber:"אור צהוב — לחכות לאישור", red:"אור אדום — נראית כמו סכין נופלת"};
-const VERSION = "2.1";
+const VERSION = "2.2";
 const GL={
  score:["ציון","תעודה למניה מ-0 עד 100. ככל שגבוה יותר, החברה טובה יותר והמחיר שלה זול יותר."],
  tiers:["רמות","ירוקה = חברה טובה במחיר טוב. צהובה = חסר לה דבר אחד או שניים. מעקב = חברה טובה שעוד לא ירדה מספיק."],
@@ -498,11 +516,16 @@ const GL={
  stw:["StockTwits","רשת חברתית שכולה סוחרים ומשקיעים. 'מקום 1' = המניה הראשונה ברשימת הטרנדים שלהם עכשיו."],
  yhs:["חיפושי Yahoo","המניות שהכי הרבה אנשים מחפשים עכשיו ב-Yahoo Finance. זה מודד סקרנות של הציבור הרחב, לא רק של סוחרים."],
  newhype:["הייפ חדש","המניה פתאום בשיחה: האזכורים קפצו פי 3 ומעלה מאתמול, או שהמסחר היום פי 5 מהרגיל."],
+ candle:["נר היפוך","נר (יום מסחר אחד) שמראה שהקונים לקחו את השליטה מהמוכרים, אחרי ירידה וליד רצפה. הסורק מחפש 3 סוגים: נר בולע שורי, פטיש וכוכב בוקר, ב-5 ימי המסחר האחרונים."],
+ engulf:["נר בולע שורי","יום ירוק גדול שה'גוף' שלו מכסה לגמרי את היום האדום שלפניו. המוכרים פתחו חזק, והקונים סגרו מעל כל מה שהמוכרים עשו אתמול."],
+ hammer:["פטיש","יום עם 'זנב' ארוך למטה: המחיר צנח במהלך היום, אבל הקונים דחפו אותו חזרה למעלה עד הסגירה. נראה כמו פטיש."],
+ mstar:["כוכב בוקר","שלושה ימים: יום אדום גדול, יום קטן של התלבטות, ויום ירוק חזק. כמו זריחה אחרי לילה."],
+ cst:["סטטוס הנר","ממתין לאישור = עוד לא היה יום אחרי הנר. מאושר = היום שאחרי החזיק מעל אמצע הנר. בוטל = המחיר ירד מתחת לשפל של הנר, אז הסימן כבר לא תקף."],
  journal:["יומן ביצועים","כל תחילת חודש הסורק מצלם את המניות הטובות ואת המחיר שלהן. ככה רואים אחר כך אם הן באמת עלו יותר מהשוק."]
 };
 const ML={"ציון":"score","ירידה מהשיא":"dd","Margin of Safety":"mos","P/FCF":"pfcf","P/E":"pe","ROIC":"roic","צמיחת הכנסות":"rev","תזמון":"timing",
  "ווליום":"vol","עסקאות ביום":"tx","מצב טכני":"tech","תצורת תחתית":"btm","דגלים":"flags","תבניות":"pat","מרחק מהפריצה":"pat","ווליום יחסי":"rvol",
- "ציון ווליום":"vol","מרחק מממוצע 150":"ma150","RSI":"rsi","ציון Dip":"score","תנודה יומית":"atr","בטא":"beta","וויקוף":"wy","אזכורים ברדיט":"ment","שינוי מאתמול":"mchg","עלייה בדירוג":"rkup","ווליום חריג":"rvol","קפיצה בעסקאות":"txj","ציון הייפ":"hscore","מקורות":"hsrc","StockTwits":"stw","חיפושי Yahoo":"yhs"};
+ "ציון ווליום":"vol","מרחק מממוצע 150":"ma150","RSI":"rsi","ציון Dip":"score","תנודה יומית":"atr","בטא":"beta","וויקוף":"wy","אזכורים ברדיט":"ment","שינוי מאתמול":"mchg","עלייה בדירוג":"rkup","ווליום חריג":"rvol","קפיצה בעסקאות":"txj","נר היפוך":"candle","ציון הייפ":"hscore","מקורות":"hsrc","StockTwits":"stw","חיפושי Yahoo":"yhs"};
 const addML=html=>html.replace(/<td data-label="([^"]+)"([^>]*)>/g,(m,l,rest)=>`<td data-label="${l}"${rest}><span class="ml">${l}${ML[l]?qm(ML[l]):""}</span>`);
 const qm=k=>GL[k]?`<button type="button" class="qm" data-k="${k}" aria-label="מה זה ${GL[k][0]}?">?</button>`:"";
 const CHK_KEY=[["צמיחת הכנסות","rev"],["EPS","eps"],["FCF","fcf"],["ROIC","roic"],["Gross","gm"],["Operating","om"],["Net Debt","nd"],["Interest","ic"],["דילול","dil"],
@@ -524,6 +547,7 @@ const COLS = [
   {k:"tx", l:"עסקאות/יום", sort:s=>s.vol&&s.vol.tx?s.vol.tx.n20:null},
   {k:"atr", l:"תנודה יומית", sort:s=>s.risk?s.risk.atr:null},
   {k:"beta", l:"בטא", sort:s=>s.risk?s.risk.beta:null},
+  {k:"candle", l:"נר היפוך", sort:s=>s.candle?CDRANK[s.candle.st]:null},
   {k:"wy", l:"וויקוף", sort:s=>s.wy?s.wy.score:null},
   {k:"tech", l:"מצב טכני", sort:s=>({down:0,flat:1,up:2})[s.tech.state]},
   {k:"btm", l:"תצורת תחתית", sort:s=>(s.bottom||[]).length},
@@ -582,7 +606,7 @@ function renderTiers(){
 }
 
 function renderHead(){
-  const HK={score:"score",dd52:"dd",mos:"mos",pfcf:"pfcf",pe:"pe",roic:"roic",rev_g:"rev",timing:"timing",vol:"vol",tx:"tx",tech:"tech",btm:"btm",flags:"flags",atr:"atr",beta:"beta",wy:"wy"};
+  const HK={score:"score",dd52:"dd",mos:"mos",pfcf:"pfcf",pe:"pe",roic:"roic",rev_g:"rev",timing:"timing",vol:"vol",tx:"tx",tech:"tech",btm:"btm",flags:"flags",atr:"atr",beta:"beta",wy:"wy",candle:"candle"};
   $("thead").innerHTML = COLS.map((c,i)=>`<th data-i="${i}" class="${c.sort?"srt":""}" ${c.k===st.key?`aria-sort="${st.dir<0?"descending":"ascending"}"`:""}>${c.l}${qm(HK[c.k])}</th>`).join("");
   $("dsortk").value=st.key; $("dsortd").textContent=st.dir<0?"▼ מהגבוה":"▲ מהנמוך";
   $("thead").querySelectorAll("th").forEach(th=>th.onclick=()=>{
@@ -598,7 +622,7 @@ function apply(){
   const capOk=c=>!capf||(capf==="small"?c<2:capf==="mid"?c>=2&&c<10:c>=10);
   view = ALL.filter(s=>
     (st.tier==="all"||s.tier===st.tier) && (!sec||s.sector===sec) && (!tech||s.tech.state===tech) &&
-    (s.dd52??0)>=dd && (!onlyNew||s.new) && (!noRed||!s.red.length) && (!onlyBtm||(s.bottom||[]).length) && capOk(s.cap) && (!tmf||(s.timing&&s.timing.light===tmf)) && (vf===""||(s.vol&&s.vol.score>=+vf)) && txOk(s.vol,dtx,dav) && riskOk(s.risk,datr,dbeta) && wyOk(s.wy,$("dwy").value) &&
+    (s.dd52??0)>=dd && (!onlyNew||s.new) && (!noRed||!s.red.length) && (!onlyBtm||(s.bottom||[]).length) && capOk(s.cap) && (!tmf||(s.timing&&s.timing.light===tmf)) && (vf===""||(s.vol&&s.vol.score>=+vf)) && txOk(s.vol,dtx,dav) && riskOk(s.risk,datr,dbeta) && wyOk(s.wy,$("dwy").value) && cdOk(s.candle,$("dcd").value) &&
     (!q||s.t.toLowerCase().includes(q)||s.name.toLowerCase().includes(q)));
   const c=COLS.find(c=>c.k===st.key);
   view.sort((a,b)=>{const x=c.sort(a),y=c.sort(b); if(x==null&&y==null)return 0; if(x==null)return 1; if(y==null)return -1; return (x>y?1:x<y?-1:0)*st.dir;});
@@ -624,6 +648,7 @@ function renderRows(){
     <td data-label="עסקאות ביום" class="num">${s.vol&&s.vol.tx?`<span class="ltr">${fmtN(s.vol.tx.n20)}</span>`:'<span class="mut">—</span>'}</td>
     <td data-label="תנודה יומית">${atrCell(s.risk)}</td>
     <td data-label="בטא">${betaCell(s.risk)}</td>
+    <td data-label="נר היפוך">${cdCell(s.candle)}</td>
     <td data-label="וויקוף">${wyCell(s.wy)}</td>
     <td data-label="מצב טכני" class="tech">${TECH[s.tech.state]}</td>
     <td data-label="תצורת תחתית">${(s.bottom||[]).map(b=>`<span class="badge btm">${esc(b.n)}</span>`).join("")||'<span class="mut">—</span>'}</td>
@@ -681,6 +706,23 @@ function wyBlock(W){
     ${W.events.length?`<table class="chk">${W.events.map(e=>`<tr><td class="mut num ltr" style="width:64px">${esc(e.d)}</td><td>${esc(e.t)}${e.e.startsWith("SPRING")?qm("spring"):""}</td></tr>`).join("")}</table>`:'<p class="mut" style="font-size:13px;margin:4px 0 0">לא נמצאו אירועים ברורים בחצי השנה האחרונה.</p>'}
     ${W.flags.length?`<div class="flagbox y"><ul>${W.flags.map(f=>`<li>${esc(f)}</li>`).join("")}</ul></div>`:""}
     <p class="mut" style="font-size:12.5px;margin:8px 0 0">הסורק מזהה רק התנהגות מחיר וווליום שמתאימה לדפוס — לא את מה שגופים גדולים באמת עושים. לא משפיע על הציון.</p>
+  </section>`;
+}
+const CDC={confirmed:"pos",pending:"",failed:"neg"};
+const cdCell=C=>C?`<span>${esc(C.n)}</span> <span class="badge ${C.st==="confirmed"?"bo":C.st==="failed"?"":"btm"}">${esc(C.stn)}</span>`:'<span class="mut">—</span>';
+const cdOk=(C,f)=>!f||(C&&(f==="active"?C.st!=="failed":f===C.st||f===C.k));
+const CDRANK={confirmed:3,pending:2,failed:1};
+function cdBlock(C){
+  if(!C) return "";
+  return `<section class="blk"><h3><span>נר היפוך ליד תמיכה${qm("candle")}</span><small>${esc(C.d)}</small></h3>
+    <div class="kv" style="margin:0 0 6px"><b>${esc(C.n)}</b>${qm(C.k)}<span class="badge ${C.st==="confirmed"?"bo":C.st==="failed"?"":"btm"}">${esc(C.stn)}</span>${qm("cst")}</div>
+    <div class="stats" style="margin-bottom:8px">
+      <div class="stat"><span>הרצפה שהנר נשען עליה</span><b style="font-size:15px">${esc(C.sup)} <span class="ltr num">$${C.sup_lvl}</span></b></div>
+      <div class="stat"><span>נקודת ביטול${qm("stop")}</span><b class="ltr num" style="font-size:16px">$${C.low}</b><span>שפל הנר</span></div>
+      <div class="stat"><span>ווליום ביום הנר</span><b style="font-size:15px">${C.vol_ok?'<span class="pos">גבוה מהרגיל ✓</span>':'<span class="mut">רגיל</span>'}</b></div>
+    </div>
+    ${C.strong?'<p style="font-size:13px;margin:0">סגר גם מעל השיא של היום הקודם — גרסה חזקה יותר של הנר.</p>':""}
+    <p class="mut" style="font-size:12.5px;margin:8px 0 0">נר הוא סימן של יום אחד, לא הבטחה. אם המחיר יורד מתחת לשפל שלו, הסימן בוטל. לא משפיע על הציון.</p>
   </section>`;
 }
 const txOk=(V,txv,avv)=>(txv===""||(V&&V.tx&&V.tx.n20>=+txv)) && (avv===""||(V&&V.av20>=+avv));
@@ -744,6 +786,7 @@ function openDrawer(t){
     ${checks("אופי הירידה", s.checks.d, s.d, "var(--d)")}
     ${s.risk?`<div class="kv" style="margin-top:14px"><span>תנודה יומית${qm("atr")} <b>${atrCell(s.risk)}</b></span><span>בטא${qm("beta")} <b>${betaCell(s.risk)}</b></span></div>`:""}
     ${s.timing?timingBlock(s.timing):""}
+    ${cdBlock(s.candle)}
     ${wyBlock(s.wy)}
     ${volBlock(s.vol)}
     <section class="blk"><h3><span>מגמות ${yrs}</span></h3><div class="sparks">
@@ -791,7 +834,7 @@ document.querySelectorAll(".filtbtn").forEach(b=>b.onclick=()=>{
 });
 addEventListener("scroll",()=>{$("tip").hidden=true},true);
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeDrawer()});
-["q","sector","tech","dd","capf","tmf","dwy","vf","dtx","dav","datr","dbeta","onlynew","nored","onlybtm"].forEach(id=>$(id).addEventListener("input",()=>{shown=100;apply()}));
+["q","sector","tech","dd","capf","tmf","dcd","dwy","vf","dtx","dav","datr","dbeta","onlynew","nored","onlybtm"].forEach(id=>$(id).addEventListener("input",()=>{shown=100;apply()}));
 $("more").onclick=()=>{shown+=100;renderRows()};
 
 // ---------- הייפ ----------
@@ -872,6 +915,7 @@ const PCOLS=[
   {k:"rsi",l:"RSI",q:"rsi",sort:p=>p.rsi?p.rsi.rsi:null},
   {k:"atr",l:"תנודה יומית",q:"atr",sort:p=>p.risk?p.risk.atr:null},
   {k:"beta",l:"בטא",q:"beta",sort:p=>p.risk?p.risk.beta:null},
+  {k:"candle",l:"נר היפוך",q:"candle",sort:p=>p.candle?CDRANK[p.candle.st]:null},
   {k:"wy",l:"וויקוף",q:"wy",sort:p=>p.wy?p.wy.score:null},
   {k:"chart",l:"160 ימי מסחר",sort:null},
   {k:"score",l:"ציון Dip",q:"score",sort:p=>p.score},
@@ -911,7 +955,7 @@ function applyPat(){
   const typeOk=t=>!ptype||(ptype==="crypto"?(t==="coin"||t==="crypto_etf"):(t||"stock")===ptype);
   const v=PATS.filter(p=>{
     const xs=p.pats.filter(x=>(!pk||x.k===pk)&&(!st||x.st===st));
-    return xs.length && typeOk(p.type) && exOk(p) && (pvf===""||(p.vol&&p.vol.score>=+pvf)) && txOk(p.vol,ptx,pav) && riskOk(p.risk,patr,pbeta) && wyOk(p.wy,$("pwy").value) && (!dip||p.tier==="green"||p.tier==="yellow") &&
+    return xs.length && typeOk(p.type) && exOk(p) && (pvf===""||(p.vol&&p.vol.score>=+pvf)) && txOk(p.vol,ptx,pav) && riskOk(p.risk,patr,pbeta) && wyOk(p.wy,$("pwy").value) && cdOk(p.candle,$("pcd").value) && (!dip||p.tier==="green"||p.tier==="yellow") &&
       (!m150||(p.ma150!=null&&Math.abs(p.ma150)*100<=m150)) && (!up150||p.ma150_up) && (!q||p.t.toLowerCase().includes(q)||p.name.toLowerCase().includes(q));
   });
   if(ps.key){ const c=PCOLS.find(x=>x.k===ps.key); v.sort(cmp(c.sort,ps.dir)); }
@@ -930,6 +974,7 @@ function applyPat(){
       <td data-label="RSI">${p.rsi&&p.rsi.rsi!=null?`<span class="${p.rsi.s===1?"pos":p.rsi.s===0?"neg":""}">${esc(p.rsi.n)}</span> <span class="mut ltr num">${p.rsi.rsi}</span>`:'<span class="mut">—</span>'}</td>
       <td data-label="תנודה יומית">${atrCell(p.risk)}</td>
       <td data-label="בטא">${betaCell(p.risk)}</td>
+      <td data-label="נר היפוך">${cdCell(p.candle)}</td>
       <td data-label="וויקוף">${wyCell(p.wy)}</td>
       <td data-label="גרף">${mini(p)}</td>
       <td data-label="ציון Dip">${p.score==null?'<span class="mut">—</span>':`<span class="dot ${p.tier}"></span><span class="num">${p.score.toFixed(0)}</span>`}</td>
@@ -939,7 +984,7 @@ function applyPat(){
     tr.onclick=go; tr.onkeydown=e=>{if(e.key==="Enter")go()};
   });
 }
-["pq","ptype","pex","pst","pwy","pvf","ptx","pav","patr","pbeta","pdip","p150","p150up"].forEach(id=>$(id).addEventListener("input",applyPat));
+["pq","ptype","pex","pst","pcd","pwy","pvf","ptx","pav","patr","pbeta","pdip","p150","p150up"].forEach(id=>$(id).addEventListener("input",applyPat));
 
 // ---------- יומן ----------
 let JR=null;
@@ -973,7 +1018,8 @@ function renderJournal(){
         ${(()=>{const lg=sn.stocks.filter(x=>x.light==="green"), lr=sn.stocks.filter(x=>x.light==="red");
           const lv=sn.stocks.filter(x=>x.vol!=null&&x.vol>=4), pv=sn.pats.filter(x=>x.vol!=null&&x.vol>=4);
           const lw=sn.stocks.filter(x=>["SPRING_CONFIRMED","MARKUP","ACCUMULATION"].includes(x.wy)), hy=sn.hype||[];
-          return (lw.length?stat("Dip עם וויקוף חיובי", avg(lw.map(r)), lw.length):"") + (hy.length?stat("🔥 מניות בהייפ", avg(hy.map(r)), hy.length):"") + (lv.length?stat("Dip עם ווליום 4+", avg(lv.map(r)), lv.length):"") + (pv.length?stat("תבניות עם ווליום 4+", avg(pv.map(r)), pv.length):"") + (lg.length?stat("עם אור ירוק בתזמון", avg(lg.map(r)), lg.length):"")+(lr.length?stat("עם אור אדום בתזמון", avg(lr.map(r)), lr.length):"");})()}
+          const lc=sn.stocks.filter(x=>x.candle==="confirmed"||x.candle==="pending");
+          return (lc.length?stat("Dip עם נר היפוך", avg(lc.map(r)), lc.length):"") + (lw.length?stat("Dip עם וויקוף חיובי", avg(lw.map(r)), lw.length):"") + (hy.length?stat("🔥 מניות בהייפ", avg(hy.map(r)), hy.length):"") + (lv.length?stat("Dip עם ווליום 4+", avg(lv.map(r)), lv.length):"") + (pv.length?stat("תבניות עם ווליום 4+", avg(pv.map(r)), pv.length):"") + (lg.length?stat("עם אור ירוק בתזמון", avg(lg.map(r)), lg.length):"")+(lr.length?stat("עם אור אדום בתזמון", avg(lr.map(r)), lr.length):"");})()}
         ${(()=>{const T=x=>x.type||"stock", ps=sn.pats.filter(x=>T(x)==="stock"), pe=sn.pats.filter(x=>T(x)==="etf"), pc=sn.pats.filter(x=>T(x)==="coin"||T(x)==="crypto_etf"), pi=sn.pats.filter(x=>T(x)==="intl");
           return stat("תבניות — מניות", avg(ps.map(r)), ps.length) + (pe.length?stat("תבניות — תעודות סל", avg(pe.map(r)), pe.length):"") + (pc.length?stat("תבניות — קריפטו", avg(pc.map(r)), pc.length):"") + (pi.length?stat("תבניות — בורסות זרות", avg(pi.map(r)), pi.length):"");})()}
         ${stat("S&P 500", spy)}
